@@ -11,7 +11,7 @@ router.post('/create',
     body('name').isString().withMessage('Name must be a string'), 
     projectController.createProjectController);
 
-
+router.get('/all', authMiddleware.authUser, projectController.getAllProjectsController);
 
 
 export default router;

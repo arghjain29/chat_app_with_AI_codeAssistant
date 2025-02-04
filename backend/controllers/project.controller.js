@@ -27,3 +27,20 @@ export const createProjectController = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const getAllProjectsController = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        if (!userId) {
+            return res.status(400).json({ message: "User Authentication Not defined" });
+        }
+        const projects = await projectService.getAllProjects(userId);
+        if (projects.status === 400) {
+            return res.status(400).json({ message: projects.message });
+        }
+        res.status(200).json(projects);
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

@@ -31,7 +31,7 @@ const Register = () => {
     try {
       const response = await axios.post("/api/users/register", registerDetails);
       // console.log(response.data);
-      localStorage.setItem('token', JSON.stringify(response.data.token));
+      localStorage.setItem('token', response.data.token);
       setUser(response.data.user);
       navigate("/");
     } catch (error) {
