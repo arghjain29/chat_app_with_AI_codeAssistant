@@ -8,13 +8,19 @@ export const createUserController = async (req, res) => {
         return res.status(400).json({ errors: errors.array() });
     }
     try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            throw new Error('Email and password are required');
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) {
+            throw new Error('Username, Email and password are required');
         }
+        const userExists = await userModel.findOne({ email });
+        if(userExists) {
+            return res.status(400).json({ message: "User already exists" });
+        };
         const hashPassword = await userModel.hashPassword(password);
-        const user = await userModel.create({ email, password: hashPassword });
+        const user = (await userModel.create({ username, email, password: hashPassword }));
         const token = await user.generateJWT();
+
+        delete user._doc.password;
         res.status(201).json({ user, token });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -41,6 +47,8 @@ export const loginUserController = async (req, res) => {
         }
 
         const token = await user.generateJWT();
+
+        delete user._doc.password;
         res.status(201).json({ user, token });
 
 
@@ -58,6 +66,7 @@ export const profileController = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
+        delete user._doc.password;
         res.status(200).json(user);
     } catch (error) {
         res.status(500).json({ message: error.message });
