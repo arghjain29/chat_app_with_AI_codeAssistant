@@ -61,8 +61,8 @@ export const loginUserController = async (req, res) => {
 
 export const profileController = async (req, res) => {
     try {
-        const email = req.user.email;
-        const user = await userModel.find({email});
+        const userId = req.user._id;
+        const user = await userModel.findById(userId);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -79,6 +79,19 @@ export const logoutController = async (req, res) => {
         console.log(token);
         radisClient.set(token, 'logout', 'EX', 60 * 60 * 24);
         res.status(200).json({ message: "Logout successful" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const allUsersController = async (req, res) => {
+    const userId = req.user._id;
+    try {
+        const users = await userModel.find({ _id: { $ne: userId } });
+        if (!users || users.length === 0) {
+            return res.status(404).json({ message: "No users found" });
+        }
+        res.status(200).json(users);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

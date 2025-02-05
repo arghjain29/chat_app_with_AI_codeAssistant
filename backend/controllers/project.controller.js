@@ -44,3 +44,58 @@ export const getAllProjectsController = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const addUserToProjectController = async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+        const {users, projectId} = req.body;
+        const userId = req.user._id;
+
+        if (!users || users.length === 0) {
+            return res.status(400).json({ message: "Users are required" });
+        }
+        if (!projectId) {
+            return res.status(400).json({ message: "Project Id is required" });
+        }
+        if (!userId) {
+            return res.status(400).json({ message: "User Authentication Not defined" });
+        }
+
+        const response = await projectService.addUserToProjects({ users, projectId, loggedInUser: userId });
+        if (response.status === 400){
+            return res.status(400).json({ message: response.message });
+        }
+        if (response.status === 200){
+            return res.status(200).json(response.project);
+        }
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const getByProjectIdController = async (req, res) => {
+    try {
+        const projectId = req.params.projectId;
+        if (!projectId) {
+            return res.status(400).json({ message: "Project Id is required" });
+        }
+        // if (!userId) {
+        //     return res.status(400).json({ message: "User Authentication Not defined" });
+        // }
+        const project = await projectService.getProjectById({projectId});
+        if (project.status === 400){
+            return res.status(400).json({ message: project.message });
+        }
+        if (project.status === 200){
+            return res.status(200).json(project.project);
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
