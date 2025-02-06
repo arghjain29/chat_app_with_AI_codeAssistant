@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import { useLocation } from "react-router-dom";
 const Project = () => {
   const location = useLocation();
