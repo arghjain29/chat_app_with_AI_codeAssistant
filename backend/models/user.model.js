@@ -32,15 +32,14 @@ userSchema.statics.hashPassword = async (password) => {
 }
 
 userSchema.methods.isValidPassword = async function (password) {
-    console.log(password, this.password);
     return await bcrypt.compare(password, this.password);
 }
 
 userSchema.methods.generateJWT = function () {
     return jwt.sign(
-        { email: this.email, _id: this._id},
+        { email: this.email, _id: this._id },
         process.env.JWT_SECRET,
-        {expiresIn: '24h'}
+        { expiresIn: '24h' }
     );
 }
 

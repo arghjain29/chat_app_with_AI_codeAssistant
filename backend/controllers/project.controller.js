@@ -1,5 +1,4 @@
 import * as projectService from "../services/project.service.js";
-// import projectModel from '../models/project.model.js';
 import { validationResult } from "express-validator";
 
 export const createProjectController = async (req, res) => {
@@ -71,7 +70,7 @@ export const addUserToProjectController = async (req, res) => {
             return res.status(400).json({ message: response.message });
         }
         if (response.status === 200){
-            return res.status(200).json(response.project);
+            return res.status(200).json(response);
         }
 
     } catch (error) {

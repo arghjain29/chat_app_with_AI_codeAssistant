@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useContext, useState, useEffect } from "react";
-import { UserContext } from "../context/user.context.jsx";
-import {useNavigate} from "react-router-dom";
+import { UserContext } from "../context/userContext.jsx";
+import { useNavigate } from "react-router-dom";
 import axios from "../config/axios.js";
 
 const Home = () => {
@@ -10,7 +11,6 @@ const Home = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectName, setProjectName] = useState(""); // project name for modal
   const [projects, setProjects] = useState([]); // this contains all the projects after fetching
-  
 
   useEffect(
     () => {
@@ -72,7 +72,7 @@ const Home = () => {
           <div
             key={project._id}
             onClick={() => {
-              navigate(`/project`,{state: {project: project} });
+              navigate(`/project`, { state: { id: project._id } });
             }} // navigate to project page
             className="project p-4 border rounded-md border-slate-300 hover:border-slate-400 flex flex-col gap-2 items-center justify-between mb-4 cursor-pointer bg-white shadow-md min-w-52 hover:bg-slate-100 "
           >
@@ -81,7 +81,10 @@ const Home = () => {
               {project.name}
             </span>
             <div className="flex text-gray-600">
-              <p><i className="ri-user-3-line mr-1"></i>Collaborators: {project.users.length} </p>
+              <p>
+                <i className="ri-user-3-line mr-1"></i>Collaborators:{" "}
+                {project.users.length}{" "}
+              </p>
             </div>
           </div>
         ))}

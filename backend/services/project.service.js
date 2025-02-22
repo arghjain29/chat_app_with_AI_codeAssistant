@@ -29,7 +29,7 @@ export const getAllProjects = async (userId) => {
         throw new Error('User is required');
     }
 
-    const projects = await projectModel.find({ users: userId });
+    const projects = await projectModel.find({ users: userId }).populate('users');
     if (projects.length === 0) {
         return { status: 400, message: 'No projects found' };
     }

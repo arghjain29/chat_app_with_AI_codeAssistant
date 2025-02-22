@@ -1,8 +1,6 @@
 /* eslint-disable react/prop-types */
-import { createContext, useState} from "react";
-
-// Create a context for the user
-export const UserContext = createContext();
+import { useState } from "react";
+import { UserContext } from "./userContext.jsx";
 
 // Create a provider component
 export const UserProvider = ({ children }) => {
@@ -14,3 +12,4 @@ export const UserProvider = ({ children }) => {
     </UserContext.Provider>
   );
 };
+
