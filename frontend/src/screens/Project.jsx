@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { useState, useEffect, useContext, createRef } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext.jsx";
 import {
@@ -13,7 +13,7 @@ const Project = () => {
   const location = useLocation();
   const { user } = useContext(UserContext);
   const projectId = location.state.id;
-  const messageBox = createRef();
+  const messageBox = useRef(null);
 
   const [leftPanel, setLeftPanel] = useState(false); // Side panel state
   const [addUserModal, setAddUserModal] = useState(false); // Add user modal state
@@ -90,10 +90,12 @@ const Project = () => {
       console.log(data);
       appendIcomingMessage(data);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const appendIcomingMessage = (message) => {
-    const messageBox = document.querySelector(".message-box");
+
+    if (!messageBox.current) return;
     const Message = document.createElement("div");
     Message.className =
       "incoming message flex flex-col p-2 bg-slate-50 max-w-56 rounded-lg mb-2 m-2";
@@ -105,12 +107,12 @@ const Project = () => {
       ${message.message}
     </p>
     `;
-    messageBox.appendChild(Message);
+    messageBox.current.appendChild(Message);
     scrollToBottom();
   };
 
   const appendOutgoingMessage = (message) => {
-    const messageBox = document.querySelector(".message-box");
+    if (!messageBox.current) return;
     const Message = document.createElement("div");
     Message.className =
       "outgoing ml-auto message flex flex-col p-2  bg-slate-500 text-white max-w-56 min-w-20 rounded-lg mb-2 m-2";
@@ -122,11 +124,12 @@ const Project = () => {
       ${message}
     </p>
     `;
-    messageBox.appendChild(Message);
+    messageBox.current.appendChild(Message);
     scrollToBottom();
   };
 
   const scrollToBottom = () => {
+    if (!messageBox.current) return;
     messageBox.current.scrollTop = messageBox.current.scrollHeight;
   }
 

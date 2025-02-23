@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import connectDB from './database/db.js';
 import userRoutes from './routes/user.routes.js';
 import projectRoutes from './routes/project.routes.js';
+import aiRoutes from './routes/ai.routes.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.get('/', (req, res) => {
 
 app.use( '/api/users', userRoutes);
 app.use( '/api/projects', projectRoutes);
+app.use( '/api/ai', aiRoutes);
 
 export default app;
 

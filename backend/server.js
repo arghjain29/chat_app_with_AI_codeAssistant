@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { Server } from 'socket.io';
 dotenv.config();
 import { socketMiddleware } from './middleware/auth.middleware.js';
+import * as ai from './services/ai.service.js';
 
 const port = process.env.PORT || 3000;
 
@@ -23,8 +24,18 @@ io.on('connection', socket => {
     console.log(socket.projectRoomId);
     socket.join(socket.projectRoomId);
 
-    socket.on('project-message', data => {
+    socket.on('project-message', async (data) => {
+
+        const aiIsPresent = data.message.includes('@ai');
+        if (aiIsPresent) {
+            const prompt = data.message.replace('@ai', '');
+            const result = await ai.generateResult(prompt);
+            data.message = result;
+            data.sender = 'CodeAI';
+            io.to(socket.projectRoomId).emit('project-message', data);
+        } else {
         socket.broadcast.to(socket.projectRoomId).emit('project-message', data);
+        }
     })
 
 
