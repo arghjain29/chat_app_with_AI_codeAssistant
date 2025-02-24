@@ -1,7 +1,9 @@
-/* eslint-disable no-unused-vars */
 import { useState, useEffect, useContext, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { UserContext } from "../context/userContext.jsx";
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
+import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import Markdown from "markdown-to-jsx";
 import {
   intializeSocket,
   recieveMessage,
@@ -22,6 +24,7 @@ const Project = () => {
   const [projectCollabs, setProjectCollabs] = useState([]); // Project collaborators state
   const [thisProject, setThisProject] = useState({}); // Project state
   const [message, setMessage] = useState(""); // sending Message state
+  const [messages, setMessages] = useState([]); // Messages state
 
   const closeModal = () => {
     setAddUserModal(false);
@@ -88,50 +91,31 @@ const Project = () => {
 
     recieveMessage("project-message", (data) => {
       console.log(data);
-      appendIcomingMessage(data);
+      appendIncomingMessage(data);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const appendIcomingMessage = (message) => {
-
-    if (!messageBox.current) return;
-    const Message = document.createElement("div");
-    Message.className =
-      "incoming message flex flex-col p-2 bg-slate-50 max-w-56 rounded-lg mb-2 m-2";
-    Message.innerHTML = `
-    <small class="text-end bg-slate-800 text-sm rounded-md w-fit px-2 text-white opacity-65 mb-2">
-      ${message.sender}
-    </small>
-    <p class="text-left">
-      ${message.message}
-    </p>
-    `;
-    messageBox.current.appendChild(Message);
+  const appendIncomingMessage = (message) => {
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      { ...message, type: "incoming" },
+    ]);
     scrollToBottom();
   };
 
   const appendOutgoingMessage = (message) => {
-    if (!messageBox.current) return;
-    const Message = document.createElement("div");
-    Message.className =
-      "outgoing ml-auto message flex flex-col p-2  bg-slate-500 text-white max-w-56 min-w-20 rounded-lg mb-2 m-2";
-    Message.innerHTML = `
-    <small class="opacity-85 bg-slate-800 text-sm rounded-md w-fit px-2 text-white mb-2">
-      Me
-    </small>
-    <p class="text-end">
-      ${message}
-    </p>
-    `;
-    messageBox.current.appendChild(Message);
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      { message, sender: "Me", type: "outgoing" },
+    ]);
     scrollToBottom();
   };
 
   const scrollToBottom = () => {
     if (!messageBox.current) return;
     messageBox.current.scrollTop = messageBox.current.scrollHeight;
-  }
+  };
 
   return (
     <main className="h-screen w-screen flex">
@@ -164,7 +148,59 @@ const Project = () => {
           <div
             ref={messageBox}
             className="message-box flex flex-grow flex-col overflow-y-auto scroll-smooth max-h-full "
-          ></div>
+          >
+            {messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`message flex flex-col p-2 ${
+                  msg.sender === "CodeAI" ? "max-w-80" : "max-w-56"
+                } rounded-lg mb-2 m-2 ${
+                  msg.type === "incoming"
+                    ? "bg-slate-50"
+                    : "bg-slate-500 text-white ml-auto"
+                }`}
+              >
+                <small
+                  className={`text-sm rounded-md w-fit px-2 mb-2 ${
+                    msg.type === "incoming"
+                      ? "bg-slate-800 text-white opacity-65"
+                      : "bg-slate-800 text-white opacity-85"
+                  }`}
+                >
+                  {msg.sender}
+                </small>
+                {msg.sender === "CodeAI" ? (
+                  <div className="overflow-auto bg-slate-800 text-white rounded-sm p-2">
+                    <Markdown
+                      options={{
+                        overrides: {
+                          code: {
+                            component: SyntaxHighlighter,
+                            props: {
+                              style: atomOneDark,
+                            },
+                          },
+                        },
+                      }}
+                      className={
+                        msg.type === "incoming" ? "text-left" : "text-end"
+                      }
+                    >
+                      {msg.message}
+                    </Markdown>
+                  </div>
+                ) : (
+                  <p
+                    className={
+                      msg.type === "incoming" ? "text-left" : "text-end"
+                    }
+                  >
+                    {msg.message}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
           {/* Input container */}
           <div className="input-container p-2 border-t absolute bottom-0 w-full z-10 bg-slate-200 border-slate-200">
             <div className="inputField w-full flex gap-2 bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -187,7 +223,7 @@ const Project = () => {
 
         {/* Side pannel Modal  */}
         <div
-          className={`sidepanel min-w-96 flex flex-col gap-2 h-screen bg-slate-300 absolute top-0  transition-all duration-300 ease-in-out ${
+          className={`sidepanel min-w-96 flex flex-col gap-2 h-screen bg-slate-300 absolute top-0 z-20  transition-all duration-300 ease-in-out ${
             leftPanel ? "left-0" : "left-[-100%]"
           }`}
         >

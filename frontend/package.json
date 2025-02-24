@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "axios": "^1.7.9",
+    "markdown-to-jsx": "^7.7.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.5",
+    "react-syntax-highlighter": "^15.6.1",
     "remixicon": "^4.6.0",
     "socket.io-client": "^4.8.1"
   },
