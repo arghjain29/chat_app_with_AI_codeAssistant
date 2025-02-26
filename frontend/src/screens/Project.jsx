@@ -25,11 +25,47 @@ const Project = () => {
   const [thisProject, setThisProject] = useState({}); // Project state
   const [message, setMessage] = useState(""); // sending Message state
   const [messages, setMessages] = useState([]); // Messages state
+  const [selectedFile, setSelectedFile] = useState(""); // Selected file state
+  const [fileTree, setFileTree] = useState(null); // File tree state
 
   const closeModal = () => {
     setAddUserModal(false);
     setSelectedUserId([]);
   };
+
+  function getSyntaxHighlighterLanguage(filename) {
+    const extensionMap = {
+      js: "javascript",
+      ts: "typescript",
+      py: "python",
+      java: "java",
+      cpp: "cpp",
+      c: "c",
+      cs: "csharp",
+      rb: "ruby",
+      php: "php",
+      swift: "swift",
+      go: "go",
+      kt: "kotlin",
+      rs: "rust",
+      sh: "bash",
+      html: "xml", // Syntax highlighter uses 'xml' for HTML
+      css: "css",
+      scss: "scss",
+      json: "json",
+      xml: "xml",
+      yaml: "yaml",
+      md: "markdown",
+      sql: "sql",
+      lua: "lua",
+      r: "r",
+      dart: "dart",
+      txt: "text",
+    };
+
+    const ext = filename.split(".").pop().toLowerCase();
+    return extensionMap[ext] || "text"; // Default to 'text' if unknown
+  }
 
   // final Submit button
   const handleAddCollaborator = async () => {
@@ -84,24 +120,68 @@ const Project = () => {
     setMessage("");
   };
 
+  function WriteAimessage(msg) {
+    const messageText = JSON.parse(msg.message);
+    return (
+      <div className="overflow-auto bg-slate-800 text-white rounded-sm p-2">
+        <Markdown
+          options={{
+            overrides: {
+              code: {
+                component: SyntaxHighlighter,
+                props: {
+                  style: atomOneDark,
+                },
+              },
+              p: {
+                component: "div",
+              },
+            },
+          }}
+          className={msg.type === "incoming" ? "text-left" : "text-end"}
+        >
+          {messageText.text}
+        </Markdown>
+      </div>
+    );
+  }
+
   useEffect(() => {
     intializeSocket(projectId);
     fetchProjectDetails();
     fetchAllUsers();
-
+  
     recieveMessage("project-message", (data) => {
-      console.log(data);
+      let message;
+  
+      try {
+        message = data.message ? JSON.parse(data.message) : null;
+      } catch (error) {
+        console.error("Invalid JSON message received:", data.message, error);
+        message = null;
+      }
+  
+      if (message?.fileTree) {
+        setFileTree(message.fileTree);
+      }
+  
       appendIncomingMessage(data);
     });
+  
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+
+  useEffect(() => {
+    if (!messageBox.current) return;
+    scrollToBottom();
+  }, [messages]);
 
   const appendIncomingMessage = (message) => {
     setMessages((prevMessages) => [
       ...prevMessages,
       { ...message, type: "incoming" },
     ]);
-    scrollToBottom();
   };
 
   const appendOutgoingMessage = (message) => {
@@ -109,12 +189,72 @@ const Project = () => {
       ...prevMessages,
       { message, sender: "Me", type: "outgoing" },
     ]);
-    scrollToBottom();
   };
 
   const scrollToBottom = () => {
     if (!messageBox.current) return;
     messageBox.current.scrollTop = messageBox.current.scrollHeight;
+  };
+
+  // -----------------------------------------------------------
+
+  const renderFileTree = (tree, depth = 0) => {
+    return Object.keys(tree).map((key) => {
+      const item = tree[key];
+      const isFolder = item.children;
+      return (
+        <div key={key} className={`ml-${depth * 2} transition-all`}>
+          <div
+            className={`flex items-center gap-2 cursor-pointer px-3 py-1 rounded-md transition-all ${
+              isFolder
+                ? "text-yellow-400 hover:bg-yellow-800/20"
+                : "text-blue-400 hover:bg-blue-800/20"
+            }`}
+            onClick={() => !isFolder && setSelectedFile(key)}
+          >
+            <i
+              className={`text-lg ${
+                isFolder ? "ri-folder-2-fill" : "ri-file-line"
+              }`}
+            ></i>
+            <span className="font-medium">{key}</span>
+          </div>
+          {isFolder && (
+            <div className="ml-4">
+              {renderFileTree(item.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  const getFileContents = (tree, filename) => {
+    for (const key in tree) {
+      if (tree[key].file.contents && key === filename) {
+        return tree[key].file.contents;
+      }
+      if (tree[key].children) {
+        const result = getFileContents(tree[key].children, filename);
+        if (result) return result;
+      }
+    }
+    return "";
+  };
+
+  const updateFileContents = (tree, filename, newContent) => {
+    const newTree = { ...tree };
+    const traverse = (node) => {
+      for (const key in node) {
+        if (key === filename && node[key].file.contents !== undefined) {
+          node[key].file.contents = newContent;
+          return;
+        }
+        if (node[key].children) traverse(node[key].children);
+      }
+    };
+    traverse(newTree);
+    return newTree;
   };
 
   return (
@@ -170,25 +310,7 @@ const Project = () => {
                   {msg.sender}
                 </small>
                 {msg.sender === "CodeAI" ? (
-                  <div className="overflow-auto bg-slate-800 text-white rounded-sm p-2">
-                    <Markdown
-                      options={{
-                        overrides: {
-                          code: {
-                            component: SyntaxHighlighter,
-                            props: {
-                              style: atomOneDark,
-                            },
-                          },
-                        },
-                      }}
-                      className={
-                        msg.type === "incoming" ? "text-left" : "text-end"
-                      }
-                    >
-                      {msg.message}
-                    </Markdown>
-                  </div>
+                  WriteAimessage(msg)
                 ) : (
                   <p
                     className={
@@ -210,6 +332,7 @@ const Project = () => {
                 placeholder="Enter message here"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendMessageHandler()}
               />
               <button
                 className="px-4 text-slate-600 hover:text-slate-900"
@@ -258,9 +381,47 @@ const Project = () => {
         </div>
       </section>
 
-      {/* Right Section  */}
-      <section className="right flex-grow bg-slate-200">
-        {/* Main content area */}
+      <section className="right flex-grow h-full flex bg-slate-700">
+        {/* File Explorer */}
+        {fileTree && (
+          <div className="explorer h-full min-w-56 bg-neutral-900 text-white p-3 overflow-auto">
+            <h1 className="text-center font-semibold text-lg mb-3">
+              📂 File Explorer
+            </h1>
+            <div className="file-tree">{renderFileTree(fileTree)}</div>
+          </div>
+        )}
+
+        {/* Code Editor */}
+        {selectedFile && (
+          <div className="code-editor flex-grow h-full overflow-y-scroll bg-neutral-800 p-4">
+            <h1 className="text-white font-semibold text-lg mb-3">
+              📝 {selectedFile}
+            </h1>
+            <div className="code-editor-area p-1 rounded-lg bg-neutral-900 text-white shadow-lg">
+              <SyntaxHighlighter
+                wrapLines={true}
+                contentEditable={true}
+                suppressContentEditableWarning
+                language={getSyntaxHighlighterLanguage(selectedFile)}
+                spellCheck={false}
+                style={atomOneDark}
+                onBlur={(e) => {
+                  const updatedContent = e.target.innerText;
+                  setFileTree((prevFileTree) =>
+                    updateFileContents(
+                      prevFileTree,
+                      selectedFile,
+                      updatedContent
+                    )
+                  );
+                }}
+              >
+                {getFileContents(fileTree, selectedFile)}
+              </SyntaxHighlighter>
+            </div>
+          </div>
+        )}
       </section>
 
       {addUserModal && (
