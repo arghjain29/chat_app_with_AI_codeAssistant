@@ -329,7 +329,7 @@ const Project = () => {
               <input
                 className="flex-grow p-2 px-4 border-none outline-none text-sm"
                 type="text"
-                placeholder="Enter message here"
+                placeholder="start with @ai to chat with AI"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMessageHandler()}
