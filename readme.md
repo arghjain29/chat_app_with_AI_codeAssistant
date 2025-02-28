@@ -20,6 +20,7 @@ This project is an AI-powered chat application built using the MERN (MongoDB, Ex
 - **Axios**: For making HTTP requests.
 - **Socket.io-client**: For real-time communication.
 - **Tailwind CSS**: For styling the application.
+- **RemixIcon**: For Icons.
 - **WebContainer**: For running and previewing projects in real-time.
 
 ### Backend
@@ -68,8 +69,7 @@ This project is an AI-powered chat application built using the MERN (MongoDB, Ex
 
 1. Clone the repository:
      ```bash
-     git clone https://github.com/your-username/ai-chat-app.git
-     cd ai-chat-app
+     git clone https://github.com/arghjain29/chat_app_with_AI_codeAssistant
      ```
 
 2. Install dependencies for the frontend:
@@ -97,6 +97,12 @@ REDIS_PASSWORD=your_redis_password
 GOOGLE_AI_KEY=your_google_ai_key
 ```
 
+Create a `.env` file in the `frontend` directory and add the following environment variables:
+
+```
+VITE_API_URL = http://localhost:3000
+```
+
 ### Running the Application
 
 1. Start the backend server:
@@ -111,7 +117,6 @@ GOOGLE_AI_KEY=your_google_ai_key
      npm run dev
      ```
 
-3. Open your browser and navigate to `http://localhost:3000`.
 
 ## Usage
 
