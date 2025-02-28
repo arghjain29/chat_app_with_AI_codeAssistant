@@ -10,8 +10,11 @@ import {
   sendMessage,
 } from "../config/socket.js";
 import axios from "../config/axios.js";
+import { getWebContainer } from "../config/webContainer.js";
 
 const Project = () => {
+  const [webContainer, setWebContainer] = useState(null);
+
   const location = useLocation();
   const { user } = useContext(UserContext);
   const projectId = location.state.id;
@@ -27,6 +30,8 @@ const Project = () => {
   const [messages, setMessages] = useState([]); // Messages state
   const [selectedFile, setSelectedFile] = useState(""); // Selected file state
   const [fileTree, setFileTree] = useState(null); // File tree state
+  const [runProcess, setRunProcess] = useState(null); // Run process state
+  const [iframeUrl, setIframeUrl] = useState(null); // Iframe URL state
 
   const closeModal = () => {
     setAddUserModal(false);
@@ -110,6 +115,7 @@ const Project = () => {
       setProjectCollabs(res.data.users);
     } catch (error) {
       console.log(error);
+      return;
     }
   };
 
@@ -146,31 +152,78 @@ const Project = () => {
     );
   }
 
+  function transformToWebContainerTree(fileTree, rootName = "myproject") {
+    function transformNode(node) {
+      if (node.children && Object.keys(node.children).length > 0) {
+        return {
+          directory: Object.fromEntries(
+            Object.entries(node.children).map(([key, value]) => [
+              key,
+              transformNode(value),
+            ])
+          ),
+        };
+      } else if (node.file && node.file.contents !== undefined) {
+        return { file: { contents: node.file.contents } };
+      }
+      return {}; // Ensures empty objects aren't misinterpreted
+    }
+
+    return {
+      [rootName]: {
+        directory: Object.fromEntries(
+          Object.entries(fileTree).map(([key, value]) => [
+            key,
+            transformNode(value),
+          ])
+        ),
+      },
+    };
+  }
+
   useEffect(() => {
     intializeSocket(projectId);
     fetchProjectDetails();
     fetchAllUsers();
-  
-    recieveMessage("project-message", (data) => {
+
+    if (!webContainer) {
+      getWebContainer().then((container) => {
+        setWebContainer(container);
+        console.log("WebContainer initialized");
+      });
+    }
+
+    recieveMessage("project-message", async (data) => {
       let message;
-  
+
       try {
         message = data.message ? JSON.parse(data.message) : null;
       } catch (error) {
         console.error("Invalid JSON message received:", data.message, error);
         message = null;
       }
-  
       if (message?.fileTree) {
         setFileTree(message.fileTree);
+        console.log(message.fileTree);
+
+        const webContainerTree = transformToWebContainerTree(message.fileTree);
+        console.log(webContainerTree);
+        // Ensure webContainer is initialized before calling .mount()
+        const container = webContainer || (await getWebContainer());
+        if (container) {
+          container.mount(webContainerTree).then(() => {
+            console.log("File tree mounted");
+          });
+        } else {
+          console.error("WebContainer is still null. Mounting failed.");
+        }
       }
-  
+
       appendIncomingMessage(data);
     });
-  
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
 
   useEffect(() => {
     if (!messageBox.current) return;
@@ -383,7 +436,7 @@ const Project = () => {
 
       <section className="right flex-grow h-full flex bg-slate-700">
         {/* File Explorer */}
-        {fileTree && (
+        {fileTree !== null && (
           <div className="explorer h-full min-w-56 bg-neutral-900 text-white p-3 overflow-auto">
             <h1 className="text-center font-semibold text-lg mb-3">
               📂 File Explorer
@@ -395,10 +448,75 @@ const Project = () => {
         {/* Code Editor */}
         {selectedFile && (
           <div className="code-editor flex-grow h-full overflow-y-scroll bg-neutral-800 p-4">
-            <h1 className="text-white font-semibold text-lg mb-3">
-              📝 {selectedFile}
-            </h1>
-            <div className="code-editor-area p-1 rounded-lg bg-neutral-900 text-white shadow-lg">
+            <header className="flex justify-between items-center">
+              <h1 className="text-white font-semibold text-lg mb-3">
+                📝 {selectedFile}
+              </h1>
+              <div className="mb-3 flex text-white justify-between items-center gap-2 mr-3">
+                <button
+                  className="terminal px-2 hover:text-black hover:bg-slate-200 rounded-md transition-all ease-in-out "
+                  onClick={async () => {
+
+                    if (runProcess) {
+                      runProcess.kill();
+                    }
+
+                    let tempRunProcess = await webContainer.spawn(
+                      "npm",
+                      ["start"],
+                      {
+                        cwd: "/myproject",
+                      }
+                    );
+
+                    tempRunProcess.output.pipeTo(
+                      new WritableStream({
+                        write(chunk) {
+                          console.log(chunk);
+                        },
+                      })
+                    );
+
+                    setRunProcess(tempRunProcess);
+
+                    webContainer.on("server-ready", (port, url) => {
+                      console.log(port, url);
+                      setIframeUrl(url);
+                    });
+                  }}
+                >
+                  <i className="ri-play-line text-lg"></i>
+                </button>
+                <button
+                  className="px-2 hover:text-black hover:bg-slate-200 rounded-md transition-all ease-in-out"
+                  onClick={async () => {
+                    const files = await webContainer.fs.readdir("/myproject");
+                    console.log(files);
+
+                    const installProcess = await webContainer.spawn(
+                      "npm",
+                      ["install"],
+                      {
+                        cwd: "/myproject",
+                      }
+                    );
+
+                    installProcess.output.pipeTo(
+                      new WritableStream({
+                        write(chunk) {
+                          console.log(chunk);
+                        },
+                      })
+                    );
+                  }}
+                >
+                  <i className="ri-window-line text-lg"></i>
+                </button>
+              </div>
+            </header>
+            <hr className="border-slate-600 mb-3" />
+            {/* Code Editor Area */}
+            <div className="code-editor-area p-1 rounded-lg  bg-neutral-900 text-white shadow-lg">
               <SyntaxHighlighter
                 wrapLines={true}
                 contentEditable={true}
@@ -419,6 +537,36 @@ const Project = () => {
               >
                 {getFileContents(fileTree, selectedFile)}
               </SyntaxHighlighter>
+            </div>
+          </div>
+        )}
+
+        {/* Iframe Viewer */}
+        {iframeUrl && webContainer && (
+          <div className="iframe-container flex flex-col h-full w-full md:w-1/2 border-l border-slate-600 bg-neutral-900">
+            {/* Address Bar */}
+            <div className="address-bar p-2 bg-slate-800 flex items-center gap-2 border-b border-slate-700">
+              <input
+                type="text"
+                value={iframeUrl}
+                onChange={(e) => setIframeUrl(e.target.value)}
+                className="w-full p-2 px-4 bg-slate-700 text-white text-sm rounded-md outline-none border border-slate-600 placeholder-white"
+              />
+              <button
+                className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-all"
+                onClick={() => setIframeUrl(iframeUrl + '/')}
+              >
+                <i className="ri-refresh-line text-lg"></i>
+              </button>
+              
+            </div>
+
+            {/* Iframe Display */}
+            <div className="iframe-wrapper flex-grow bg-neutral-900 text-white border-t border-slate-700">
+              <iframe
+                src={iframeUrl}
+                className="w-full text-white filter invert h-full rounded-md border-none"
+              ></iframe>
             </div>
           </div>
         )}

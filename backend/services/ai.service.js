@@ -162,7 +162,10 @@ AI : {
 
    
 
-IMPORTANT : don't use file name like routes/index.js, don't need to send package-lock.json
+IMPORTANT : don't use file name like routes/index.js, don't need to send package-lock.json,
+if there are names with special characters like @testing-library/jest-dom, provide them like this - \"@testing-library/jest-dom\"
+give port number little complex , like 6455, between 6000-9000, dont give comments in .json type files.
+GIVE PROPER RESULT SO THAT IT CAN BE USED IN WEB CONTAINER.
    
    
 `
