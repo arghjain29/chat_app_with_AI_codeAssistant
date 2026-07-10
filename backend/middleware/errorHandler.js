@@ -4,17 +4,7 @@ const errorHandler = (err, req, res, next) => {
     const statusCode = err.statusCode || 500;
     const message = err.isOperational ? err.message : 'Internal server error';
 
-    logger.error({
-        err: {
-            message: err.message,
-            stack: err.stack,
-            code: err.code,
-        },
-        requestId: req.id,
-        method: req.method,
-        url: req.originalUrl,
-        statusCode,
-    }, `Error: ${err.message}`);
+    logger.error(`${req.method} ${req.originalUrl} ${statusCode} - ${err.message}`);
 
     res.status(statusCode).json({
         message,

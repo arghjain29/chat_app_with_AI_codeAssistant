@@ -26,7 +26,7 @@ export const authUser = async (req, res, next) => {
         if (error.isOperational) {
             return res.status(error.statusCode).json({ message: error.message });
         }
-        logger.warn({ err: error }, 'Auth middleware error');
+        logger.warn('Auth middleware error');
         res.status(401).json({ message: 'Please authenticate' });
     }
 };
@@ -57,7 +57,7 @@ export const socketMiddleware = async (socket, next) => {
         socket.projectRoomId = project.project._id.toString();
         next();
     } catch (error) {
-        logger.warn({ err: error }, 'Socket auth error');
+        logger.warn('Socket auth error');
         next(new Error('not authorized'));
     }
 };

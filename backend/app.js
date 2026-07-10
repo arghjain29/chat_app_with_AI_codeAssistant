@@ -3,14 +3,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import mongoSanitize from 'express-mongo-sanitize';
-import pinoHttp from 'pino-http';
+import morgan from 'morgan';
 import connectDB from './database/db.js';
 import userRoutes from './routes/user.routes.js';
 import projectRoutes from './routes/project.routes.js';
 import aiRoutes from './routes/ai.routes.js';
-import requestId from './middleware/requestId.js';
 import errorHandler from './middleware/errorHandler.js';
-import logger from './utils/logger.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -19,19 +17,9 @@ connectDB();
 
 const app = express();
 
-const httpLogger = pinoHttp({
-    logger,
-    genReqId: (req) => req.id,
-    customLogLevel: (req, res, err) => {
-        if (res.statusCode >= 400 || err) return 'error';
-        return 'info';
-    },
-});
-
 app.use(helmet());
 app.use(mongoSanitize());
-app.use(requestId);
-app.use(httpLogger);
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms'));
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
