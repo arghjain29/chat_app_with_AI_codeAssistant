@@ -4,7 +4,7 @@ import { UserContext } from "../context/userContext.jsx";
 import { ToastContext } from "../components/ToastContext.jsx";
 import ConfirmModal from "../components/ConfirmModal.jsx";
 import Markdown from "markdown-to-jsx";
-import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
+import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
   intializeSocket,
@@ -248,6 +248,7 @@ const Project = () => {
       } catch {
         message = null;
       }
+      console.log("[Project] Received message:", message);
       if (message?.fileTree) {
         const newFileTree = message.fileTree;
         setFileTree(newFileTree);
@@ -290,7 +291,7 @@ const Project = () => {
   const renderFileTree = (tree, depth = 0) => {
     return Object.keys(tree).map((key) => {
       const item = tree[key];
-      const isFolder = item.children;
+      const isFolder = !(item.file && item.file.contents !== undefined);
       return (
         <div key={key} style={{ marginLeft: depth * 12 }}>
           <div
@@ -308,7 +309,7 @@ const Project = () => {
             <i className={`text-sm ${isFolder ? "ri-folder-2-fill" : "ri-file-line"}`}></i>
             <span>{key}</span>
           </div>
-          {isFolder && (
+          {isFolder && item.children && Object.keys(item.children).length > 0 && (
             <div>{renderFileTree(item.children, depth + 1)}</div>
           )}
         </div>
@@ -326,7 +327,7 @@ const Project = () => {
         if (result !== undefined) return result;
       }
     }
-    return "";
+    return undefined;
   };
 
   const isOwner = user && projectCollabs.length > 0 && projectCollabs[0]._id === user._id;
@@ -530,6 +531,7 @@ const Project = () => {
               </div>
               <div className="code-editor flex-grow overflow-y-auto bg-neutral-800 p-4">
                 <SyntaxHighlighter
+                  key={selectedFile}
                   wrapLines={true}
                   contentEditable={true}
                   suppressContentEditableWarning
@@ -543,7 +545,7 @@ const Project = () => {
                     );
                   }}
                 >
-                  {getFileContents(fileTree, selectedFile)}
+                  {getFileContents(fileTree, selectedFile) ?? ""}
                 </SyntaxHighlighter>
               </div>
             </div>

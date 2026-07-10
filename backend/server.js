@@ -5,7 +5,6 @@ import { Server } from 'socket.io';
 dotenv.config();
 import { socketMiddleware } from './middleware/auth.middleware.js';
 import * as ai from './services/ai.service.js';
-import logger from './utils/logger.js';
 
 const port = process.env.PORT || 3000;
 
@@ -21,7 +20,7 @@ const io = new Server(server, {
 io.use(socketMiddleware);
 
 io.on('connection', socket => {
-    logger.info({ socketId: socket.id, projectId: socket.projectRoomId, userId: socket.user?._id }, 'Socket connected');
+    console.log(`Socket connected: ${socket.id}`);
     socket.join(socket.projectRoomId);
 
     socket.on('project-message', async (data) => {
@@ -35,7 +34,7 @@ io.on('connection', socket => {
                 data.sender = 'CodeAI';
                 io.to(socket.projectRoomId).emit('project-message', data);
             } catch (error) {
-                logger.error({ err: error, projectId: socket.projectRoomId }, 'AI generation failed');
+                console.error('AI generation failed:', error.message);
                 socket.emit('project-message', {
                     message: 'AI request failed. Please try again.',
                     sender: 'System',
@@ -47,27 +46,24 @@ io.on('connection', socket => {
     });
 
     socket.on('disconnect', () => {
-        logger.info({ socketId: socket.id, projectId: socket.projectRoomId }, 'Socket disconnected');
+        console.log(`Socket disconnected: ${socket.id}`);
         socket.leave(socket.projectRoomId);
     });
 });
 
 
+
 const gracefulShutdown = (signal) => {
-    logger.info(`${signal} received. Shutting down gracefully...`);
+    console.log(`${signal} received. Shutting down...`);
     server.close(() => {
-        logger.info('Server closed');
         process.exit(0);
     });
-    setTimeout(() => {
-        logger.error('Forced shutdown after timeout');
-        process.exit(1);
-    }, 10000);
+    setTimeout(() => process.exit(1), 10000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 server.listen(port, () => {
-    logger.info(`Server running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 });

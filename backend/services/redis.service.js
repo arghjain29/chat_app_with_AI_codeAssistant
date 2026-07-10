@@ -1,5 +1,4 @@
 import Redis from 'ioredis';
-import logger from '../utils/logger.js';
 
 let redisClient;
 let redisAvailable = false;
@@ -11,35 +10,25 @@ try {
         password: process.env.REDIS_PASSWORD,
         maxRetriesPerRequest: 3,
         retryStrategy(times) {
-            if (times > 10) {
-                logger.warn('Redis: max retries reached, giving up');
-                return null;
-            }
-            const delay = Math.min(times * 100, 3000);
-            return delay;
+            if (times > 10) return null;
+            return Math.min(times * 100, 3000);
         },
         enableOfflineQueue: false,
     });
 
     redisClient.on('connect', () => {
         redisAvailable = true;
-        logger.info('Redis connected');
+        console.log('Redis connected');
     });
 
-    redisClient.on('error', (err) => {
+    redisClient.on('error', () => {
         redisAvailable = false;
-        logger.error({ err }, 'Redis connection error');
-    });
-
-    redisClient.on('reconnecting', () => {
-        logger.info('Redis reconnecting');
     });
 
     redisClient.on('close', () => {
         redisAvailable = false;
     });
-} catch (err) {
-    logger.error({ err }, 'Redis client creation failed');
+} catch {
     redisClient = null;
 }
 
@@ -49,8 +38,7 @@ export const safeRedisGet = async (key) => {
     try {
         if (!isRedisAvailable()) return null;
         return await redisClient.get(key);
-    } catch (err) {
-        logger.warn({ err }, 'Redis GET failed');
+    } catch {
         return null;
     }
 };
@@ -60,8 +48,7 @@ export const safeRedisSet = async (key, value, ...args) => {
         if (!isRedisAvailable()) return false;
         await redisClient.set(key, value, ...args);
         return true;
-    } catch (err) {
-        logger.warn({ err }, 'Redis SET failed');
+    } catch {
         return false;
     }
 };

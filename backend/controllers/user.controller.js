@@ -2,7 +2,6 @@ import userModel from "../models/user.model.js";
 import { validationResult } from "express-validator";
 import { safeRedisSet } from "../services/redis.service.js";
 import { AppError, ConflictError, AuthError, NotFoundError } from "../utils/errors.js";
-import logger from "../utils/logger.js";
 
 export const createUserController = async (req, res, next) => {
     const errors = validationResult(req);
@@ -23,7 +22,6 @@ export const createUserController = async (req, res, next) => {
         const token = await user.generateJWT();
 
         delete user._doc.password;
-        logger.info({ userId: user._id }, 'User registered');
         res.status(201).json({ user, token });
     } catch (error) {
         next(error);
@@ -52,7 +50,6 @@ export const loginUserController = async (req, res, next) => {
         const token = await user.generateJWT();
 
         delete user._doc.password;
-        logger.info({ userId: user._id }, 'User logged in');
         res.status(200).json({ user, token });
 
     } catch (error) {
@@ -97,7 +94,6 @@ export const updateProfileController = async (req, res, next) => {
             throw new NotFoundError('User');
         }
 
-        logger.info({ userId }, 'Profile updated');
         res.status(200).json(user);
     } catch (error) {
         next(error);
@@ -126,7 +122,6 @@ export const changePasswordController = async (req, res, next) => {
         user.password = await userModel.hashPassword(newPassword);
         await user.save();
 
-        logger.info({ userId }, 'Password changed');
         res.status(200).json({ message: 'Password updated successfully' });
     } catch (error) {
         next(error);
@@ -146,7 +141,6 @@ export const deleteAccountController = async (req, res, next) => {
             await safeRedisSet(token, 'logout', 'EX', 60 * 60 * 24);
         }
 
-        logger.info({ userId }, 'Account deleted');
         res.status(200).json({ message: 'Account deleted successfully' });
     } catch (error) {
         next(error);
@@ -158,7 +152,6 @@ export const logoutController = async (req, res, next) => {
         const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
         await safeRedisSet(token, 'logout', 'EX', 60 * 60 * 24);
         res.clearCookie('token');
-        logger.info({ userId: req.user._id }, 'User logged out');
         res.status(200).json({ message: "Logout successful" });
     } catch (error) {
         next(error);

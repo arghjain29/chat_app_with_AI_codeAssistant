@@ -3,7 +3,6 @@ import { safeRedisGet } from '../services/redis.service.js';
 import mongoose from 'mongoose';
 import { getProjectById } from '../services/project.service.js';
 import { AuthError } from '../utils/errors.js';
-import logger from '../utils/logger.js';
 
 
 export const authUser = async (req, res, next) => {
@@ -26,7 +25,6 @@ export const authUser = async (req, res, next) => {
         if (error.isOperational) {
             return res.status(error.statusCode).json({ message: error.message });
         }
-        logger.warn('Auth middleware error');
         res.status(401).json({ message: 'Please authenticate' });
     }
 };
@@ -57,7 +55,6 @@ export const socketMiddleware = async (socket, next) => {
         socket.projectRoomId = project.project._id.toString();
         next();
     } catch (error) {
-        logger.warn('Socket auth error');
         next(new Error('not authorized'));
     }
 };
