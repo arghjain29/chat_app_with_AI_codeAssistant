@@ -160,7 +160,16 @@ const Project = () => {
   };
 
   function WriteAimessage(msg) {
-    const messageText = JSON.parse(msg.message);
+    let messageText;
+    try {
+      messageText = JSON.parse(msg.message);
+    } catch {
+      return (
+        <div className="overflow-auto bg-slate-800 text-white rounded-sm p-2">
+          <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+        </div>
+      );
+    }
     return (
       <div className="overflow-auto bg-slate-800 text-white rounded-sm p-2">
         <Markdown
@@ -179,7 +188,7 @@ const Project = () => {
           }}
           className={msg.type === "incoming" ? "text-left" : "text-end"}
         >
-          {messageText.text}
+          {messageText.text || ""}
         </Markdown>
       </div>
     );
