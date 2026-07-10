@@ -1,7 +1,8 @@
 import * as projectService from "../services/project.service.js";
 import { validationResult } from "express-validator";
+import logger from "../utils/logger.js";
 
-export const createProjectController = async (req, res) => {
+export const createProjectController = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -10,41 +11,25 @@ export const createProjectController = async (req, res) => {
     try {
         const { name } = req.body;
         const userId = req.user._id;
-        if (!name) {
-            return res.status(400).json({ message: "Name is required" });
-        }
-        if (!userId) {
-            return res.status(400).json({ message: "User Authentication Not defined" });
-        }
         const newProject = await projectService.createProject({ name, userId });
-        if (newProject.status === 400) {
-            return res.status(400).json({ message: newProject.message });
-        }
+        logger.info({ projectId: newProject._id, userId }, 'Project created');
         res.status(201).json(newProject);
-
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-export const getAllProjectsController = async (req, res) => {
+export const getAllProjectsController = async (req, res, next) => {
     try {
         const userId = req.user._id;
-        if (!userId) {
-            return res.status(400).json({ message: "User Authentication Not defined" });
-        }
         const projects = await projectService.getAllProjects(userId);
-        if (projects.status === 400) {
-            return res.status(400).json({ message: projects.message });
-        }
         res.status(200).json(projects);
-
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-export const addUserToProjectController = async (req, res) => {
+export const addUserToProjectController = async (req, res, next) => {
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
@@ -54,47 +39,50 @@ export const addUserToProjectController = async (req, res) => {
     try {
         const {users, projectId} = req.body;
         const userId = req.user._id;
-
-        if (!users || users.length === 0) {
-            return res.status(400).json({ message: "Users are required" });
-        }
-        if (!projectId) {
-            return res.status(400).json({ message: "Project Id is required" });
-        }
-        if (!userId) {
-            return res.status(400).json({ message: "User Authentication Not defined" });
-        }
-
         const response = await projectService.addUserToProjects({ users, projectId, loggedInUser: userId });
-        if (response.status === 400){
-            return res.status(400).json({ message: response.message });
-        }
-        if (response.status === 200){
-            return res.status(200).json(response);
-        }
-
+        logger.info({ projectId, addedUsers: users, addedBy: userId }, 'Users added to project');
+        return res.status(200).json(response);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-export const getByProjectIdController = async (req, res) => {
+export const getByProjectIdController = async (req, res, next) => {
     try {
         const projectId = req.params.projectId;
-        if (!projectId) {
-            return res.status(400).json({ message: "Project Id is required" });
-        }
-        // if (!userId) {
-        //     return res.status(400).json({ message: "User Authentication Not defined" });
-        // }
         const project = await projectService.getProjectById({projectId});
-        if (project.status === 400){
-            return res.status(400).json({ message: project.message });
-        }
-        if (project.status === 200){
-            return res.status(200).json(project.project);
-        }
+        res.status(200).json(project.project);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
+    }
+};
+
+export const deleteProjectController = async (req, res, next) => {
+    try {
+        const projectId = req.params.projectId;
+        const userId = req.user._id;
+        await projectService.deleteProject({ projectId, userId });
+        logger.info({ projectId, userId }, 'Project deleted');
+        res.status(200).json({ message: 'Project deleted successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const updateProjectController = async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+        const projectId = req.params.projectId;
+        const { name } = req.body;
+        const userId = req.user._id;
+        const project = await projectService.updateProject({ projectId, name, userId });
+        logger.info({ projectId, userId }, 'Project updated');
+        res.status(200).json(project);
+    } catch (error) {
+        next(error);
     }
 };

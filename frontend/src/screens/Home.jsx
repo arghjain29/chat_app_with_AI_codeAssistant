@@ -9,49 +9,50 @@ const Home = () => {
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [projectName, setProjectName] = useState(""); // project name for modal
-  const [projects, setProjects] = useState([]); // this contains all the projects after fetching
+  const [projectName, setProjectName] = useState("");
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState("");
 
-  useEffect(
-    () => {
-      getProjects();
-    },
-    [
-      /* dependencies */
-    ]
-  );
+  useEffect(() => {
+    getProjects();
+  }, []);
 
   const createProject = async (e) => {
     e.preventDefault();
-    if (!projectName) {
-      alert("Please enter a project name");
+    setServerError("");
+    setErrors({});
+
+    if (!projectName || projectName.length < 3) {
+      setErrors({ name: "Project name must be at least 3 characters" });
       return;
     }
 
+    setCreating(true);
     try {
-      const response = await axios.post("/api/projects/create", {
-        name: projectName,
-      });
-      if (response.status === 400) {
-        alert(response.data.message);
-      }
-      if (response.status === 201) {
-        console.log(response);
-        setIsModalOpen(false);
-        setProjectName("");
-      }
+      await axios.post("/api/projects/create", { name: projectName });
+      setIsModalOpen(false);
+      setProjectName("");
+      getProjects();
     } catch (error) {
-      console.error(error.response.data);
+      const msg = error.response?.data?.message || error.response?.data?.errors?.[0]?.msg || "Failed to create project";
+      setServerError(msg);
+    } finally {
+      setCreating(false);
     }
   };
 
   const getProjects = async () => {
+    setLoading(true);
     try {
       const response = await axios.get("/api/projects/all");
-      console.log(response.data);
       setProjects(response.data);
     } catch (error) {
-      console.error(error.response.data);
+      console.error("[Home] Failed to fetch projects:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,6 +62,8 @@ const Home = () => {
         <button
           onClick={() => {
             setIsModalOpen(true);
+            setServerError("");
+            setErrors({});
           }}
           className="project p-4 border rounded-md border-slate-300 hover:border-slate-400 flex items-center justify-between mb-4 shadow-md"
         >
@@ -68,32 +71,51 @@ const Home = () => {
           New Project
         </button>
 
-        {projects.map((project) => (
-          <div
-            key={project._id}
-            onClick={() => {
-              navigate(`/project`, { state: { id: project._id } });
-            }} // navigate to project page
-            className="project p-4 border rounded-md border-slate-300 hover:border-slate-400 flex flex-col gap-2 items-center justify-between mb-4 cursor-pointer bg-white shadow-md min-w-52 hover:bg-slate-100 "
-          >
-            <span className="text-lg flex gap-2">
-              <i className="ri-folder-shared-line"></i>
-              {project.name}
-            </span>
-            <div className="flex text-gray-600">
-              <p>
-                <i className="ri-user-3-line mr-1"></i>Collaborators:{" "}
-                {project.users.length}{" "}
-              </p>
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="project p-4 border rounded-md border-slate-200 flex flex-col gap-2 items-center mb-4 bg-white shadow-md min-w-52 animate-pulse">
+              <div className="h-5 bg-slate-200 rounded w-24"></div>
+              <div className="h-4 bg-slate-200 rounded w-20"></div>
             </div>
+          ))
+        ) : projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-slate-500">
+            <i className="ri-folder-add-line text-4xl mb-2"></i>
+            <p>No projects yet. Create your first project!</p>
           </div>
-        ))}
+        ) : (
+          projects.map((project) => (
+            <div
+              key={project._id}
+              onClick={() => {
+                navigate(`/project`, { state: { id: project._id } });
+              }}
+              className="project p-4 border rounded-md border-slate-300 hover:border-slate-400 flex flex-col gap-2 items-center justify-between mb-4 cursor-pointer bg-white shadow-md min-w-52 hover:bg-slate-100 "
+            >
+              <span className="text-lg flex gap-2">
+                <i className="ri-folder-shared-line"></i>
+                {project.name}
+              </span>
+              <div className="flex text-gray-600">
+                <p>
+                  <i className="ri-user-3-line mr-1"></i>Collaborators:{" "}
+                  {project.users.length}{" "}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {isModalOpen && (
         <div className="modal fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="modal-content w-1/3 bg-white p-6 rounded-md shadow-lg">
             <h2 className="text-2xl mb-4 font-bold">New Project</h2>
+            {serverError && (
+              <div className="mb-4 p-3 rounded bg-red-500/20 border border-red-500 text-red-600 text-sm">
+                {serverError}
+              </div>
+            )}
             <form onSubmit={createProject}>
               <div className="mb-4">
                 <label
@@ -110,6 +132,7 @@ const Home = () => {
                   name="projectName"
                   className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
                 />
+                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
               </div>
               <div className="flex justify-end">
                 <button
@@ -121,9 +144,10 @@ const Home = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md"
+                  disabled={creating}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md disabled:opacity-50"
                 >
-                  Create
+                  {creating ? "Creating..." : "Create"}
                 </button>
               </div>
             </form>

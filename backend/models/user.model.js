@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
         required: true,
         select: false,
     },
-});
+}, { timestamps: true });
 
 userSchema.statics.hashPassword = async (password) => {
     return await bcrypt.hash(password, 10);
