@@ -2,12 +2,13 @@ import { useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from '../config/axios.js';
 import { UserContext } from '../context/userContext.jsx';
+import { ToastContext } from '../components/ToastContext.jsx';
 
 const Login = () => {
 
   const navigate = useNavigate();
   const { setUser } = useContext(UserContext);
-
+  const { toast } = useContext(ToastContext);
 
   const [loginDetails, setLoginDetails] = useState({
     email: '',
@@ -16,7 +17,6 @@ const Login = () => {
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [serverError, setServerError] = useState("");
 
   const validate = () => {
     const newErrors = {};
@@ -28,7 +28,6 @@ const Login = () => {
 
   const submitHandler = async (e) => {
     e.preventDefault();
-    setServerError("");
 
     if (!validate()) return;
 
@@ -37,10 +36,11 @@ const Login = () => {
       const response = await axios.post('/api/users/login', loginDetails);
       localStorage.setItem('token', response.data.token);
       setUser(response.data.user);
+      toast.success("Logged in successfully");
       navigate('/');
     } catch (error) {
       const msg = error.response?.data?.message || error.response?.data?.errors?.[0]?.msg || "Login failed";
-      setServerError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -52,11 +52,6 @@ const Login = () => {
         <h2 className="text-2xl font-bold text-white mb-6 text-center">
           Login
         </h2>
-        {serverError && (
-          <div className="mb-4 p-3 rounded bg-red-500/20 border border-red-500 text-red-400 text-sm">
-            {serverError}
-          </div>
-        )}
         <form onSubmit={submitHandler}>
           <div className="mb-4">
             <label className="block text-gray-400 mb-2" htmlFor="email">

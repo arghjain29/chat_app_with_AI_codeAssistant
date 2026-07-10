@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { UserContext } from "../context/userContext.jsx";
+import { ToastContext } from "../components/ToastContext.jsx";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import Markdown from "markdown-to-jsx";
@@ -17,7 +18,8 @@ const Project = () => {
 
   const location = useLocation();
   const { user } = useContext(UserContext);
-  const projectId = location.state.id;
+  const { toast } = useContext(ToastContext);
+  const projectId = location.state?.id;
   const messageBox = useRef(null);
 
   const [leftPanel, setLeftPanel] = useState(false); // Side panel state
@@ -80,10 +82,11 @@ const Project = () => {
         projectId: location.state.project._id,
       });
 
-      console.log(res.data.message);
+      toast.success(res.data.message);
       closeModal();
     } catch (error) {
-      console.log(error);
+      const msg = error.response?.data?.message || "Failed to add collaborators";
+      toast.error(msg);
     }
   };
 
@@ -104,7 +107,7 @@ const Project = () => {
       const res = await axios.get("/api/users/all");
       setFetchedUser(res.data);
     } catch (error) {
-      console.log(error);
+      toast.error("Failed to load users");
     }
   };
 
@@ -114,8 +117,7 @@ const Project = () => {
       setThisProject(res.data);
       setProjectCollabs(res.data.users);
     } catch (error) {
-      console.log(error);
-      return;
+      toast.error("Failed to load project details");
     }
   };
 

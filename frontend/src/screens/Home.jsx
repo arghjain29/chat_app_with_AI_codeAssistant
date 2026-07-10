@@ -3,10 +3,12 @@ import { useContext, useState, useEffect } from "react";
 import { UserContext } from "../context/userContext.jsx";
 import { useNavigate } from "react-router-dom";
 import axios from "../config/axios.js";
+import { ToastContext } from "../components/ToastContext.jsx";
 
 const Home = () => {
   useContext(UserContext);
   const navigate = useNavigate();
+  const { toast } = useContext(ToastContext);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -14,7 +16,6 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState({});
-  const [serverError, setServerError] = useState("");
 
   useEffect(() => {
     getProjects();
@@ -22,7 +23,6 @@ const Home = () => {
 
   const createProject = async (e) => {
     e.preventDefault();
-    setServerError("");
     setErrors({});
 
     if (!projectName || projectName.length < 3) {
@@ -33,12 +33,13 @@ const Home = () => {
     setCreating(true);
     try {
       await axios.post("/api/projects/create", { name: projectName });
+      toast.success("Project created");
       setIsModalOpen(false);
       setProjectName("");
       getProjects();
     } catch (error) {
       const msg = error.response?.data?.message || error.response?.data?.errors?.[0]?.msg || "Failed to create project";
-      setServerError(msg);
+      toast.error(msg);
     } finally {
       setCreating(false);
     }
@@ -50,7 +51,7 @@ const Home = () => {
       const response = await axios.get("/api/projects/all");
       setProjects(response.data);
     } catch (error) {
-      console.error("[Home] Failed to fetch projects:", error);
+      toast.error("Failed to load projects");
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,6 @@ const Home = () => {
         <button
           onClick={() => {
             setIsModalOpen(true);
-            setServerError("");
             setErrors({});
           }}
           className="project p-4 border rounded-md border-slate-300 hover:border-slate-400 flex items-center justify-between mb-4 shadow-md"
@@ -111,11 +111,6 @@ const Home = () => {
         <div className="modal fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="modal-content w-1/3 bg-white p-6 rounded-md shadow-lg">
             <h2 className="text-2xl mb-4 font-bold">New Project</h2>
-            {serverError && (
-              <div className="mb-4 p-3 rounded bg-red-500/20 border border-red-500 text-red-600 text-sm">
-                {serverError}
-              </div>
-            )}
             <form onSubmit={createProject}>
               <div className="mb-4">
                 <label

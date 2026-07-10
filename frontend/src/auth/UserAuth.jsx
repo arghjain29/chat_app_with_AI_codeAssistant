@@ -1,32 +1,3 @@
-// import { useContext, useEffect } from "react";
-// import { useNavigate } from "react-router-dom";
-// import { UserContext } from "../context/userContext";
-// import PropTypes from "prop-types";
-
-// const UserAuth = ({ children }) => {
-//   const { user } = useContext(UserContext);
-//   const navigate = useNavigate();
-//   const token = localStorage.getItem("token");
-
-//   useEffect(() => {
-//     if (!token) {
-//       navigate("/login");
-//     }
-//   }, [navigate, token]);
-
-//   if (user) {
-//     return <>{children}</>;
-//   }
-
-//   return null; // Render nothing while redirecting
-// };
-
-// UserAuth.propTypes = {
-//   children: PropTypes.node.isRequired,
-// };
-
-// export default UserAuth;
-
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
@@ -44,10 +15,12 @@ const UserAuth = ({ children }) => {
       try {
         const response = await axios.get("/api/users/profile");
         setUser(response.data);
-        setLoading(false);
       } catch (error) {
-        console.error(error);
+        console.error("[UserAuth] Session expired or invalid");
+        localStorage.removeItem("token");
         navigate("/login");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -61,14 +34,21 @@ const UserAuth = ({ children }) => {
   }, [navigate, token, user, setUser]);
 
   if (loading) {
-    return <div>Loading...</div>; // Show a loading indicator while fetching user details
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   if (user) {
     return <>{children}</>;
   }
 
-  return null; // Render nothing while redirecting
+  return null;
 };
 
 UserAuth.propTypes = {
