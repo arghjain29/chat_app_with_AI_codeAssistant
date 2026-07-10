@@ -14,6 +14,17 @@ import {
 import axios from "../config/axios.js";
 import { getWebContainer } from "../config/webContainer.js";
 
+function getSyntaxHighlighterLanguage(filename) {
+    const ext = filename.split(".").pop().toLowerCase();
+    const map = {
+      js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
+      py: "python", java: "java", cpp: "cpp", c: "c", rb: "ruby", go: "go",
+      html: "xml", htm: "xml", css: "css", scss: "scss", json: "json",
+      xml: "xml", yaml: "yaml", md: "markdown", sh: "bash", txt: "text",
+    };
+    return map[ext] || "text";
+}
+
 function formatTime(timestamp) {
     if (!timestamp) return "";
     const date = new Date(timestamp);
@@ -48,7 +59,6 @@ const Project = () => {
   const [fileTree, setFileTree] = useState(null);
   const [runProcess, setRunProcess] = useState(null);
   const [iframeUrl, setIframeUrl] = useState(null);
-  const [editorContent, setEditorContent] = useState("");
 
   // Settings state
   const [showSettings, setShowSettings] = useState(false);
@@ -292,8 +302,6 @@ const Project = () => {
             onClick={() => {
               if (!isFolder) {
                 setSelectedFile(key);
-                const contents = getFileContents(fileTree, key);
-                setEditorContent(contents);
               }
             }}
           >
@@ -319,23 +327,6 @@ const Project = () => {
       }
     }
     return "";
-  };
-
-  const handleEditorChange = (newContent) => {
-    setEditorContent(newContent);
-    const newTree = { ...fileTree };
-    const traverse = (node) => {
-      for (const key in node) {
-        if (key === selectedFile && node[key].file && node[key].file.contents !== undefined) {
-          node[key] = { ...node[key], file: { ...node[key].file, contents: newContent } };
-          return;
-        }
-        if (node[key].children) traverse(node[key].children);
-      }
-    };
-    traverse(newTree);
-    setFileTree(newTree);
-    fileTreeRef.current = newTree;
   };
 
   const isOwner = user && projectCollabs.length > 0 && projectCollabs[0]._id === user._id;
@@ -542,14 +533,17 @@ const Project = () => {
                   wrapLines={true}
                   contentEditable={true}
                   suppressContentEditableWarning
-                  language={selectedFile.split(".").pop()}
+                  language={getSyntaxHighlighterLanguage(selectedFile)}
                   spellCheck={false}
                   style={atomOneDark}
                   onBlur={(e) => {
-                    handleEditorChange(e.target.innerText);
+                    const updatedContent = e.target.innerText;
+                    setFileTree((prevFileTree) =>
+                      updateFileContents(prevFileTree, selectedFile, updatedContent)
+                    );
                   }}
                 >
-                  {editorContent}
+                  {getFileContents(fileTree, selectedFile)}
                 </SyntaxHighlighter>
               </div>
             </div>
