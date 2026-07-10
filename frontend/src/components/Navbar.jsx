@@ -54,6 +54,7 @@ const Navbar = () => {
                 </Link>
                 <button
                     onClick={handleLogout}
+                    aria-label="Logout"
                     className="text-sm text-slate-500 hover:text-red-500 transition-colors"
                 >
                     <i className="ri-logout-box-r-line"></i>

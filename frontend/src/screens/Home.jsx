@@ -112,7 +112,7 @@ const Home = () => {
 
         {isModalOpen && (
           <div className="modal fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="modal-content w-1/3 bg-white p-6 rounded-md shadow-lg">
+            <div className="modal-content w-full max-w-md mx-4 bg-white p-6 rounded-md shadow-lg">
               <h2 className="text-2xl mb-4 font-bold">New Project</h2>
               <form onSubmit={createProject}>
                 <div className="mb-4">

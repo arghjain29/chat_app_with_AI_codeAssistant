@@ -1,143 +1,163 @@
-# AI Chat Application
+# CodeCollab - AI-Powered Code Collaboration Platform
 
-This project is an AI-powered chat application built using the MERN (MongoDB, Express, React, Node.js) stack. The application allows users to register, login, create projects, and collaborate with other users in real-time. It also integrates AI capabilities to assist users with coding tasks.
+A full-stack real-time code collaboration platform with AI code generation, built on the MERN stack. Users can create projects, collaborate in real-time chat, generate code with AI, and run projects directly in the browser via WebContainer.
 
 ## Features
 
-- **User Authentication**: Users can register and login to the application.
-- **Project Management**: Users can create projects and add collaborators.
-- **Real-time Collaboration**: Users can chat and collaborate in real-time.
-- **AI Assistance**: The application integrates AI to assist users with coding tasks.
-- **File Management**: Users can manage files within their projects.
-- **WebContainer Integration**: The application uses WebContainer to run and preview projects in real-time.
+- **User Authentication** - Register/login with JWT, password hashing, token blacklisting
+- **Project Management** - Create, rename, delete projects; add/remove collaborators
+- **Real-time Chat** - Socket.io-powered messaging within project rooms
+- **AI Code Assistant** - Google Gemini integration triggered with `@ai` prefix
+- **Code Editor** - CodeMirror 6 with syntax highlighting, line numbers, bracket matching
+- **In-Browser Execution** - WebContainer runs generated code with live preview
+- **User Profiles** - Edit username, change password, delete account
+- **Toast Notifications** - Non-intrusive feedback for all actions
+- **Responsive Design** - Works on desktop and mobile
 
-## Technologies Used
+## Tech Stack
 
 ### Frontend
-
-- **Vite + React**: A JavaScript library for building user interfaces.
-- **React Router**: For routing and navigation.
-- **Axios**: For making HTTP requests.
-- **Socket.io-client**: For real-time communication.
-- **Tailwind CSS**: For styling the application.
-- **RemixIcon**: For Icons.
-- **WebContainer**: For running and previewing projects in real-time.
+- React 18 + Vite
+- React Router DOM v7
+- Tailwind CSS
+- CodeMirror 6 (editor)
+- Socket.io Client
+- Axios
+- markdown-to-jsx
+- WebContainer API
+- RemixIcon
 
 ### Backend
-
-- **Node.js**: A JavaScript runtime built on Chrome's V8 JavaScript engine.
-- **Express**: A web application framework for Node.js.
-- **MongoDB**: A NoSQL database.
-- **Mongoose**: An ODM (Object Data Modeling) library for MongoDB and Node.js.
-- **Socket.io**: For real-time communication.
-- **JWT**: For user authentication.
-- **Redis**: For caching and session management.
+- Node.js + Express
+- MongoDB + Mongoose
+- Redis (ioredis) - token blacklisting
+- Socket.io
+- Google Generative AI (Gemini)
+- JWT + bcrypt
+- helmet, express-rate-limit, express-mongo-sanitize
+- pino (structured logging)
 
 ## Project Structure
 
-### Frontend
-
-- `src/`
-    - `auth/`: Contains authentication-related components.
-    - `config/`: Contains configuration files for Axios and WebContainer.
-    - `context/`: Contains context providers for managing global state.
-    - `routes/`: Contains route definitions.
-    - `screens/`: Contains the main screens of the application.
-    - `index.css`: Global CSS file.
-    - `main.jsx`: Entry point of the React application.
-
-### Backend
-
-- `controllers/`: Contains controller functions for handling requests.
-- `database/`: Contains database connection setup.
-- `middleware/`: Contains middleware functions.
-- `models/`: Contains Mongoose models.
-- `routes/`: Contains route definitions.
-- `services/`: Contains service functions for business logic.
-- `app.js`: Main application setup.
-- `server.js`: Entry point of the Node.js server.
+```
+├── backend/
+│   ├── controllers/      # Request handlers
+│   ├── database/         # MongoDB connection
+│   ├── middleware/        # Auth, error handler, request ID
+│   ├── models/           # Mongoose schemas
+│   ├── routes/           # API route definitions
+│   ├── services/         # Business logic
+│   ├── utils/            # Error classes, logger
+│   ├── app.js            # Express app setup
+│   └── server.js         # HTTP + Socket.io server
+│
+├── frontend/
+│   └── src/
+│       ├── auth/         # Route guards
+│       ├── components/   # Reusable UI (Navbar, Toast, etc.)
+│       ├── config/       # Axios, Socket, WebContainer
+│       ├── context/      # React Context providers
+│       ├── hooks/        # Custom hooks
+│       ├── routes/       # Route definitions
+│       └── screens/      # Page components
+```
 
 ## Getting Started
 
 ### Prerequisites
-
-- Node.js
-- MongoDB
-- Redis
+- Node.js 18+
+- MongoDB Atlas (or local MongoDB)
+- Redis (Redis Labs, Upstash, or local)
 
 ### Installation
 
-1. Clone the repository:
-     ```bash
-     git clone https://github.com/arghjain29/chat_app_with_AI_codeAssistant
-     ```
+```bash
+git clone <repo-url>
+cd AI_chat_app
 
-2. Install dependencies for the frontend:
-     ```bash
-     cd frontend
-     npm install
-     ```
+# Backend
+cd backend
+npm install
 
-3. Install dependencies for the backend:
-     ```bash
-     cd ../backend
-     npm install
-     ```
+# Frontend
+cd ../frontend
+npm install
+```
 
 ### Environment Variables
 
-Create a `.env` file in the `backend` directory and add the following environment variables:
+Create `backend/.env` (see `backend/.env.example`):
 
 ```
+PORT=3000
 MONGO_URI=your_mongodb_uri
-JWT_SECRET=your_jwt_secret
+JWT_SECRET=your_strong_random_secret
+FRONTEND_URL=http://localhost:5173
 REDIS_HOST=your_redis_host
 REDIS_PORT=your_redis_port
 REDIS_PASSWORD=your_redis_password
 GOOGLE_AI_KEY=your_google_ai_key
 ```
 
-Create a `.env` file in the `frontend` directory and add the following environment variables:
-
+Create `frontend/.env`:
 ```
-VITE_API_URL = http://localhost:3000
+VITE_API_URL=http://localhost:3000
 ```
 
-### Running the Application
+### Running
 
-1. Start the backend server:
-     ```bash
-     cd backend
-     npm start
-     ```
+```bash
+# Backend (terminal 1)
+cd backend
+npm start
 
-2. Start the frontend development server:
-     ```bash
-     cd ../frontend
-     npm run dev
-     ```
+# Frontend (terminal 2)
+cd frontend
+npm run dev
+```
 
+### Deployment
+
+**Frontend (Vercel):**
+- Connect repo, framework = Vercel
+- Set `VITE_API_URL` to your backend URL
+- `vercel.json` includes COOP/COEP headers for WebContainer
+
+**Backend (Railway/Render):**
+- Deploy as a Node.js service
+- Set all environment variables
+- No vendor-specific code - works with any Node.js host
+
+## API Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/users/register` | No | Register user |
+| POST | `/api/users/login` | No | Login |
+| GET | `/api/users/profile` | Yes | Get profile |
+| PUT | `/api/users/update-profile` | Yes | Update username |
+| PUT | `/api/users/change-password` | Yes | Change password |
+| DELETE | `/api/users/delete-account` | Yes | Delete account |
+| POST | `/api/users/logout` | Yes | Logout |
+| GET | `/api/users/all` | Yes | List all users |
+| POST | `/api/projects/create` | Yes | Create project |
+| GET | `/api/projects/all` | Yes | List projects |
+| GET | `/api/projects/get-project/:id` | Yes | Get project |
+| PUT | `/api/projects/add-user` | Yes | Add collaborator |
+| PUT | `/api/projects/remove-user` | Yes | Remove collaborator |
+| PUT | `/api/projects/update-project/:id` | Yes | Rename project |
+| DELETE | `/api/projects/delete-project/:id` | Yes | Delete project |
+| GET | `/api/ai/get-result?prompt=...` | Yes | AI code generation |
 
 ## Usage
 
-1. Register a new account or login with an existing account.
-2. Create a new project and add collaborators.
-3. Start chatting and collaborating in real-time.
-4. Use the AI assistant by starting your message with `@ai`.
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
+1. Register/login
+2. Create a project
+3. Add collaborators
+4. Open the project, chat with team or use `@ai` for code generation
+5. AI responses include file trees that auto-mount in WebContainer
+6. Click files to view/edit, run with the play button, preview in the iframe
 
 ## License
 
-This project is licensed under the MIT License.
-
-## Acknowledgements
-
-- [React](https://reactjs.org/)
-- [Express](https://expressjs.com/)
-- [MongoDB](https://www.mongodb.com/)
-- [Socket.io](https://socket.io/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [WebContainer](https://webcontainers.io/)
+MIT
