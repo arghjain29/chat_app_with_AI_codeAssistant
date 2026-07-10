@@ -61,6 +61,40 @@ export const addUserToProjects = async ({ users, projectId, loggedInUser }) => {
     return { message: 'Users added successfully', project };
 };
 
+export const removeUserFromProject = async ({ targetUserId, projectId, loggedInUser }) => {
+    if (!targetUserId) {
+        throw new ValidationError('User ID is required');
+    }
+    if (!projectId) {
+        throw new ValidationError('Project Id is required');
+    }
+    if (!loggedInUser) {
+        throw new ValidationError('Logged in user is required');
+    }
+
+    const project = await projectModel.findById(projectId);
+    if (!project) {
+        throw new NotFoundError('Project');
+    }
+
+    if (project.users[0].toString() !== loggedInUser.toString()) {
+        throw new AuthError('Only the project owner can remove collaborators');
+    }
+
+    if (project.users[0].toString() === targetUserId.toString()) {
+        throw new ValidationError('Owner cannot be removed from the project');
+    }
+
+    const userIndex = project.users.findIndex(u => u.toString() === targetUserId.toString());
+    if (userIndex === -1) {
+        throw new NotFoundError('User in this project');
+    }
+
+    project.users.splice(userIndex, 1);
+    await project.save();
+    return { message: 'User removed successfully', project };
+};
+
 export const getProjectById = async ({ projectId }) => {
     if (!projectId) {
         throw new ValidationError('Project Id is required');

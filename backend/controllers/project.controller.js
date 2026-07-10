@@ -47,6 +47,23 @@ export const addUserToProjectController = async (req, res, next) => {
     }
 };
 
+export const removeUserFromProjectController = async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+        const { userId: targetUserId, projectId } = req.body;
+        const loggedInUser = req.user._id;
+        const response = await projectService.removeUserFromProject({ targetUserId, projectId, loggedInUser });
+        logger.info({ projectId, removedUser: targetUserId, removedBy: loggedInUser }, 'User removed from project');
+        return res.status(200).json(response);
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const getByProjectIdController = async (req, res, next) => {
     try {
         const projectId = req.params.projectId;

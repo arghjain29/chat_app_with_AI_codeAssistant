@@ -19,6 +19,18 @@ router.post('/login',
 
 router.get('/profile', authUser, userController.profileController);
 
+router.put('/update-profile', authUser,
+    body('username').isLength({ min: 3, max: 20 }).withMessage('Username must be 3-20 characters long')
+        .isAlphanumeric().withMessage('Username must contain only letters and numbers'),
+    userController.updateProfileController);
+
+router.put('/change-password', authUser,
+    body('currentPassword').isLength({ min: 6 }).withMessage('Current password is required'),
+    body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+    userController.changePasswordController);
+
+router.delete('/delete-account', authUser, userController.deleteAccountController);
+
 router.post('/logout', authUser, userController.logoutController);
 
 router.get('/all', authUser, userController.allUsersController);

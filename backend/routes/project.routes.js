@@ -20,6 +20,12 @@ router.put('/add-user',
     body('projectId').isString().withMessage('Project Id is required and must be a string'),
     projectController.addUserToProjectController);
 
+router.put('/remove-user',
+    authUser,
+    body('userId').isString().withMessage('User ID is required'),
+    body('projectId').isString().withMessage('Project Id is required'),
+    projectController.removeUserFromProjectController);
+
 router.get('/get-project/:projectId', authUser, projectController.getByProjectIdController);
 
 router.delete('/delete-project/:projectId', authUser, projectController.deleteProjectController);

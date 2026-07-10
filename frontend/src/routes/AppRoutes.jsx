@@ -3,6 +3,7 @@ import Login from "../screens/Login.jsx";
 import Register from "../screens/Register.jsx";
 import Project from "../screens/Project.jsx";
 import Home from "../screens/Home.jsx";
+import Profile from "../screens/Profile.jsx";
 import NotFound from "../screens/NotFound.jsx";
 import UserAuth from "../auth/UserAuth.jsx";
 
@@ -25,6 +26,14 @@ const AppRoutes = () => {
           element={
             <UserAuth>
               <Project />
+            </UserAuth>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <UserAuth>
+              <Profile />
             </UserAuth>
           }
         />

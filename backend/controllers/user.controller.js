@@ -74,6 +74,85 @@ export const profileController = async (req, res, next) => {
     }
 };
 
+export const updateProfileController = async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+        const userId = req.user._id;
+        const { username } = req.body;
+
+        const existingUser = await userModel.findOne({ username, _id: { $ne: userId } });
+        if (existingUser) {
+            throw new ConflictError('Username already taken');
+        }
+
+        const user = await userModel.findByIdAndUpdate(
+            userId,
+            { username },
+            { new: true, runValidators: true }
+        );
+        if (!user) {
+            throw new NotFoundError('User');
+        }
+
+        logger.info({ userId }, 'Profile updated');
+        res.status(200).json(user);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const changePasswordController = async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+        const userId = req.user._id;
+        const { currentPassword, newPassword } = req.body;
+
+        const user = await userModel.findById(userId).select('+password');
+        if (!user) {
+            throw new NotFoundError('User');
+        }
+
+        const isMatch = await user.isValidPassword(currentPassword);
+        if (!isMatch) {
+            throw new AuthError('Current password is incorrect');
+        }
+
+        user.password = await userModel.hashPassword(newPassword);
+        await user.save();
+
+        logger.info({ userId }, 'Password changed');
+        res.status(200).json({ message: 'Password updated successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const deleteAccountController = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const user = await userModel.findByIdAndDelete(userId);
+        if (!user) {
+            throw new NotFoundError('User');
+        }
+
+        const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+        if (token) {
+            radisClient.set(token, 'logout', 'EX', 60 * 60 * 24);
+        }
+
+        logger.info({ userId }, 'Account deleted');
+        res.status(200).json({ message: 'Account deleted successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const logoutController = async (req, res, next) => {
     try {
         const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
