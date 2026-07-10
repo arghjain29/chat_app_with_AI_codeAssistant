@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
-import redisClient from '../services/redis.service.js';
+import { safeRedisGet } from '../services/redis.service.js';
 import mongoose from 'mongoose';
 import { getProjectById } from '../services/project.service.js';
-import { AuthError, NotFoundError, ValidationError } from '../utils/errors.js';
+import { AuthError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 
 
@@ -13,7 +13,7 @@ export const authUser = async (req, res, next) => {
             throw new AuthError();
         }
 
-        const isBlacklisted = await redisClient.get(token);
+        const isBlacklisted = await safeRedisGet(token);
         if (isBlacklisted) {
             res.cookie('token', '');
             throw new AuthError('Token has been revoked');

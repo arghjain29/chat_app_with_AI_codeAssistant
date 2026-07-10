@@ -1,6 +1,6 @@
 import userModel from "../models/user.model.js";
 import { validationResult } from "express-validator";
-import radisClient from "../services/redis.service.js";
+import { safeRedisSet } from "../services/redis.service.js";
 import { AppError, ConflictError, AuthError, NotFoundError } from "../utils/errors.js";
 import logger from "../utils/logger.js";
 
@@ -143,7 +143,7 @@ export const deleteAccountController = async (req, res, next) => {
 
         const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
         if (token) {
-            radisClient.set(token, 'logout', 'EX', 60 * 60 * 24);
+            await safeRedisSet(token, 'logout', 'EX', 60 * 60 * 24);
         }
 
         logger.info({ userId }, 'Account deleted');
@@ -156,7 +156,7 @@ export const deleteAccountController = async (req, res, next) => {
 export const logoutController = async (req, res, next) => {
     try {
         const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
-        radisClient.set(token, 'logout', 'EX', 60 * 60 * 24);
+        await safeRedisSet(token, 'logout', 'EX', 60 * 60 * 24);
         res.clearCookie('token');
         logger.info({ userId: req.user._id }, 'User logged out');
         res.status(200).json({ message: "Logout successful" });
