@@ -4,6 +4,8 @@ import { UserContext } from "../context/userContext.jsx";
 import { ToastContext } from "../components/ToastContext.jsx";
 import ConfirmModal from "../components/ConfirmModal.jsx";
 import Markdown from "markdown-to-jsx";
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
+import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
   intializeSocket,
   recieveMessage,
@@ -11,30 +13,6 @@ import {
 } from "../config/socket.js";
 import axios from "../config/axios.js";
 import { getWebContainer } from "../config/webContainer.js";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
-import { javascript } from "@codemirror/lang-javascript";
-import { html } from "@codemirror/lang-html";
-import { css } from "@codemirror/lang-css";
-import { json } from "@codemirror/lang-json";
-import { oneDark } from "@codemirror/theme-one-dark";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter } from "@codemirror/language";
-import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-
-function getLanguageExtension(filename) {
-    const ext = filename.split(".").pop().toLowerCase();
-    switch (ext) {
-        case "js": return javascript();
-        case "jsx": return javascript({ jsx: true });
-        case "ts": return javascript({ typescript: true });
-        case "tsx": return javascript({ jsx: true, typescript: true });
-        case "html": case "htm": return html();
-        case "css": return css();
-        case "json": return json();
-        default: return javascript();
-    }
-}
 
 function formatTime(timestamp) {
     if (!timestamp) return "";
@@ -49,8 +27,6 @@ function formatTime(timestamp) {
 
 const Project = () => {
   const [webContainer, setWebContainer] = useState(null);
-  const editorRef = useRef(null);
-  const editorViewRef = useRef(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -58,6 +34,7 @@ const Project = () => {
   const { toast } = useContext(ToastContext);
   const projectId = location.state?.id;
   const messageBox = useRef(null);
+  const fileTreeRef = useRef(null);
 
   const [leftPanel, setLeftPanel] = useState(false);
   const [addUserModal, setAddUserModal] = useState(false);
@@ -71,6 +48,7 @@ const Project = () => {
   const [fileTree, setFileTree] = useState(null);
   const [runProcess, setRunProcess] = useState(null);
   const [iframeUrl, setIframeUrl] = useState(null);
+  const [editorContent, setEditorContent] = useState("");
 
   // Settings state
   const [showSettings, setShowSettings] = useState(false);
@@ -182,39 +160,27 @@ const Project = () => {
   };
 
   function WriteAimessage(msg) {
-    let messageText;
-    try {
-      messageText = JSON.parse(msg.message);
-    } catch {
-      return <p className="text-sm">{msg.message}</p>;
-    }
+    const messageText = JSON.parse(msg.message);
     return (
-      <div className="overflow-auto text-sm">
+      <div className="overflow-auto bg-slate-800 text-white rounded-sm p-2">
         <Markdown
           options={{
             overrides: {
               code: {
-                component: ({ children, className }) => {
-                  const isBlock = className && className.includes('language-');
-                  if (!isBlock) return <code className="bg-slate-700 px-1 rounded text-sm">{children}</code>;
-                  return (
-                    <pre className="bg-slate-900 p-2 rounded text-xs overflow-x-auto">
-                      <code>{children}</code>
-                    </pre>
-                  );
+                component: SyntaxHighlighter,
+                props: {
+                  style: atomOneDark,
                 },
               },
-              p: { component: "div" },
+              p: {
+                component: "div",
+              },
             },
           }}
+          className={msg.type === "incoming" ? "text-left" : "text-end"}
         >
-          {messageText.text || ""}
+          {messageText.text}
         </Markdown>
-        {messageText.fileTree && (
-          <div className="mt-2 p-2 bg-slate-700 rounded text-xs">
-            <p className="text-green-400 font-mono">Files created: {Object.keys(messageText.fileTree).join(", ")}</p>
-          </div>
-        )}
       </div>
     );
   }
@@ -264,8 +230,10 @@ const Project = () => {
         message = null;
       }
       if (message?.fileTree) {
-        setFileTree(message.fileTree);
-        const webContainerTree = transformToWebContainerTree(message.fileTree);
+        const newFileTree = message.fileTree;
+        setFileTree(newFileTree);
+        fileTreeRef.current = newFileTree;
+        const webContainerTree = transformToWebContainerTree(newFileTree);
         const container = webContainer || (await getWebContainer());
         if (container) {
           try {
@@ -287,60 +255,10 @@ const Project = () => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // CodeMirror effect
+  // Sync fileTree to ref for editor
   useEffect(() => {
-    if (!selectedFile || !fileTree || !editorRef.current) return;
-
-    const content = getFileContents(fileTree, selectedFile);
-    const language = getLanguageExtension(selectedFile);
-
-    if (editorViewRef.current) {
-        editorViewRef.current.destroy();
-    }
-
-    const state = EditorState.create({
-        doc: content,
-        extensions: [
-            lineNumbers(),
-            highlightActiveLineGutter(),
-            history(),
-            foldGutter(),
-            highlightActiveLine(),
-            keymap.of([
-                ...defaultKeymap,
-                ...historyKeymap,
-                ...closeBracketsKeymap,
-            ]),
-            language,
-            oneDark,
-            bracketMatching(),
-            closeBrackets(),
-            syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-            EditorView.updateListener.of((update) => {
-                if (update.docChanged) {
-                    const newContent = update.state.doc.toString();
-                    setFileTree((prev) => updateFileContents(prev, selectedFile, newContent));
-                }
-            }),
-            EditorView.theme({
-                "&": { height: "100%" },
-                ".cm-scroller": { overflow: "auto" },
-            }),
-        ],
-    });
-
-    editorViewRef.current = new EditorView({
-        state,
-        parent: editorRef.current,
-    });
-
-    return () => {
-        if (editorViewRef.current) {
-            editorViewRef.current.destroy();
-            editorViewRef.current = null;
-        }
-    };
-  }, [selectedFile, fileTree]);
+    fileTreeRef.current = fileTree;
+  }, [fileTree]);
 
   const appendIncomingMessage = (message) => {
     setMessages((prev) => [...prev, { ...message, type: "incoming" }]);
@@ -362,7 +280,13 @@ const Project = () => {
                 ? "text-yellow-400 hover:bg-yellow-800/20"
                 : "text-blue-400 hover:bg-blue-800/20"
             } ${selectedFile === key && !isFolder ? "bg-blue-800/30" : ""}`}
-            onClick={() => !isFolder && setSelectedFile(key)}
+            onClick={() => {
+              if (!isFolder) {
+                setSelectedFile(key);
+                const contents = getFileContents(fileTree, key);
+                setEditorContent(contents);
+              }
+            }}
           >
             <i className={`text-sm ${isFolder ? "ri-folder-2-fill" : "ri-file-line"}`}></i>
             <span>{key}</span>
@@ -377,20 +301,23 @@ const Project = () => {
 
   const getFileContents = (tree, filename) => {
     for (const key in tree) {
-      if (tree[key].file?.contents && key === filename) return tree[key].file.contents;
+      if (key === filename && tree[key].file && tree[key].file.contents !== undefined) {
+        return tree[key].file.contents;
+      }
       if (tree[key].children) {
         const result = getFileContents(tree[key].children, filename);
-        if (result) return result;
+        if (result !== undefined) return result;
       }
     }
     return "";
   };
 
-  const updateFileContents = (tree, filename, newContent) => {
-    const newTree = { ...tree };
+  const handleEditorChange = (newContent) => {
+    setEditorContent(newContent);
+    const newTree = { ...fileTree };
     const traverse = (node) => {
       for (const key in node) {
-        if (key === filename && node[key].file?.contents !== undefined) {
+        if (key === selectedFile && node[key].file && node[key].file.contents !== undefined) {
           node[key] = { ...node[key], file: { ...node[key].file, contents: newContent } };
           return;
         }
@@ -398,7 +325,8 @@ const Project = () => {
       }
     };
     traverse(newTree);
-    return newTree;
+    setFileTree(newTree);
+    fileTreeRef.current = newTree;
   };
 
   const isOwner = user && projectCollabs.length > 0 && projectCollabs[0]._id === user._id;
@@ -408,7 +336,7 @@ const Project = () => {
       {/* Top bar */}
       <header className="h-10 bg-slate-800 flex items-center justify-between px-3 border-b border-slate-700 shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="text-slate-400 hover:text-white transition-colors text-sm">
+          <button onClick={() => navigate("/")} className="text-slate-400 hover:text-white transition-colors text-sm" aria-label="Back to projects">
             <i className="ri-arrow-left-line"></i>
           </button>
           <span className="text-white font-medium text-sm">{thisProject.name || "Project"}</span>
@@ -417,6 +345,7 @@ const Project = () => {
           <button
             onClick={() => { setShowSettings(true); setEditProjectName(thisProject.name); }}
             className="text-slate-400 hover:text-white transition-colors text-sm px-2 py-1 rounded hover:bg-slate-700"
+            aria-label="Project settings"
           >
             <i className="ri-settings-3-line"></i>
           </button>
@@ -437,6 +366,7 @@ const Project = () => {
             <button
               onClick={() => setLeftPanel(true)}
               className="p-1.5 text-slate-600 hover:text-slate-900 rounded-md transition-colors"
+              aria-label="View collaborators"
             >
               <i className="ri-group-fill"></i>
             </button>
@@ -495,6 +425,7 @@ const Project = () => {
                 <button
                   className="px-3 text-slate-600 hover:text-slate-900 transition-colors"
                   onClick={sendMessageHandler}
+                  aria-label="Send message"
                 >
                   <i className="ri-send-plane-fill"></i>
                 </button>
@@ -510,7 +441,7 @@ const Project = () => {
           >
             <div className="flex justify-between items-center p-3 bg-white border-b border-slate-200">
               <h1 className="text-sm font-semibold">Collaborators ({projectCollabs.length})</h1>
-              <button onClick={() => setLeftPanel(false)} className="text-slate-400 hover:text-slate-700">
+              <button onClick={() => setLeftPanel(false)} className="text-slate-400 hover:text-slate-700" aria-label="Close panel">
                 <i className="ri-close-fill"></i>
               </button>
             </div>
@@ -533,6 +464,7 @@ const Project = () => {
                     <button
                       onClick={() => setShowRemoveUserConfirm(collab._id)}
                       className="text-slate-400 hover:text-red-500 transition-colors text-xs"
+                      aria-label="Remove collaborator"
                     >
                       <i className="ri-close-line"></i>
                     </button>
@@ -573,6 +505,7 @@ const Project = () => {
                       }
                     }}
                     title="Start server"
+                    aria-label="Start server"
                   >
                     <i className="ri-play-fill"></i>
                   </button>
@@ -589,12 +522,27 @@ const Project = () => {
                       }
                     }}
                     title="Install dependencies"
+                    aria-label="Install dependencies"
                   >
                     <i className="ri-download-2-line"></i>
                   </button>
                 </div>
               </div>
-              <div ref={editorRef} className="flex-grow overflow-hidden"></div>
+              <div className="code-editor flex-grow overflow-y-auto bg-neutral-800 p-4">
+                <SyntaxHighlighter
+                  wrapLines={true}
+                  contentEditable={true}
+                  suppressContentEditableWarning
+                  language={selectedFile.split(".").pop()}
+                  spellCheck={false}
+                  style={atomOneDark}
+                  onBlur={(e) => {
+                    handleEditorChange(e.target.innerText);
+                  }}
+                >
+                  {editorContent}
+                </SyntaxHighlighter>
+              </div>
             </div>
           )}
 
@@ -625,6 +573,7 @@ const Project = () => {
                 <button
                   className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition-colors"
                   onClick={() => setIframeUrl(iframeUrl + "/")}
+                  aria-label="Refresh preview"
                 >
                   <i className="ri-refresh-line"></i>
                 </button>
@@ -641,7 +590,7 @@ const Project = () => {
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Add Collaborator</h2>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-700">
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-700" aria-label="Close modal">
                 <i className="ri-close-line text-xl"></i>
               </button>
             </div>
@@ -682,7 +631,7 @@ const Project = () => {
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Project Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-700">
+              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-700" aria-label="Close settings">
                 <i className="ri-close-line text-xl"></i>
               </button>
             </div>
