@@ -2,11 +2,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState, useContext } from "react";
 import axios from "../config/axios.js";
 import { UserContext } from '../context/userContext.jsx';
+import { ToastContext } from '../components/ToastContext.jsx';
 
 
 const Register = () => {
   const navigate = useNavigate();
     const { setUser } = useContext(UserContext);
+    const { toast } = useContext(ToastContext);
 
   const [registerDetails, setRegisterDetails] = useState({
     username: "",
@@ -15,27 +17,38 @@ const Register = () => {
     cpassword: "",
   });
 
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = () => {
+    const newErrors = {};
+    if (!registerDetails.username) newErrors.username = "Username is required";
+    else if (registerDetails.username.length < 3) newErrors.username = "Username must be at least 3 characters";
+    if (!registerDetails.email) newErrors.email = "Email is required";
+    if (!registerDetails.password) newErrors.password = "Password is required";
+    else if (registerDetails.password.length < 6) newErrors.password = "Password must be at least 6 characters";
+    if (registerDetails.password !== registerDetails.cpassword) newErrors.cpassword = "Passwords do not match";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const submitHandler = async (e) => {
     e.preventDefault();
 
-    if (!registerDetails.username || !registerDetails.email || !registerDetails.password || !registerDetails.cpassword) {
-      alert("Please fill in all fields");
-      return;
-    }
+    if (!validate()) return;
 
-    if (registerDetails.password !== registerDetails.cpassword) {
-      alert("Passwords do not match");
-      return;
-    }
-
+    setLoading(true);
     try {
       const response = await axios.post("/api/users/register", registerDetails);
-      // console.log(response.data);
       localStorage.setItem('token', response.data.token);
       setUser(response.data.user);
+      toast.success("Account created successfully");
       navigate("/");
     } catch (error) {
-      console.error(error);
+      const msg = error.response?.data?.message || error.response?.data?.errors?.[0]?.msg || "Registration failed";
+      toast.error(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,9 +77,10 @@ const Register = () => {
               placeholder="Enter your email"
               required
             />
+            {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
           </div>
           <div className="mb-4">
-            <label className="block text-gray-400 mb-2" htmlFor="email">
+            <label className="block text-gray-400 mb-2" htmlFor="username">
               User Name
             </label>
             <input
@@ -80,9 +94,10 @@ const Register = () => {
                 })
               }
               className="w-full p-3 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your email"
+              placeholder="Choose a username"
               required
             />
+            {errors.username && <p className="text-red-400 text-sm mt-1">{errors.username}</p>}
           </div>
           <div className="mb-6">
             <label className="block text-gray-400 mb-2" htmlFor="password">
@@ -102,9 +117,10 @@ const Register = () => {
               required
               autoComplete="off"
             />
+            {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
           </div>
           <div className="mb-6">
-            <label className="block text-gray-400 mb-2" htmlFor="password">
+            <label className="block text-gray-400 mb-2" htmlFor="cpassword">
               Confirm Password
             </label>
             <input
@@ -121,12 +137,14 @@ const Register = () => {
               required
               autoComplete="off"
             />
+            {errors.cpassword && <p className="text-red-400 text-sm mt-1">{errors.cpassword}</p>}
           </div>
           <button
             type="submit"
-            className="w-full p-3 rounded bg-blue-500 text-white font-bold hover:bg-blue-600 transition duration-300"
+            disabled={loading}
+            className="w-full p-3 rounded bg-blue-500 text-white font-bold hover:bg-blue-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Register
+            {loading ? "Registering..." : "Register"}
           </button>
           <div className="text-center mt-4">
             <p className="text-gray-400">

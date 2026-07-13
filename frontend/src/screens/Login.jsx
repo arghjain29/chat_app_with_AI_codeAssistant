@@ -2,33 +2,47 @@ import { useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from '../config/axios.js';
 import { UserContext } from '../context/userContext.jsx';
+import { ToastContext } from '../components/ToastContext.jsx';
 
 const Login = () => {
 
   const navigate = useNavigate();
   const { setUser } = useContext(UserContext);
-
+  const { toast } = useContext(ToastContext);
 
   const [loginDetails, setLoginDetails] = useState({
     email: '',
     password: ''
   });
 
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = () => {
+    const newErrors = {};
+    if (!loginDetails.email) newErrors.email = "Email is required";
+    if (!loginDetails.password) newErrors.password = "Password is required";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const submitHandler = async (e) => {
     e.preventDefault();
 
-    if (!loginDetails.email || !loginDetails.password) {
-      alert("Please fill in all fields");
-      return;
-    }
+    if (!validate()) return;
 
+    setLoading(true);
     try {
       const response = await axios.post('/api/users/login', loginDetails);
       localStorage.setItem('token', response.data.token);
       setUser(response.data.user);
+      toast.success("Logged in successfully");
       navigate('/');
     } catch (error) {
-      console.error(error.response);
+      const msg = error.response?.data?.message || error.response?.data?.errors?.[0]?.msg || "Login failed";
+      toast.error(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,6 +65,7 @@ const Login = () => {
               placeholder="Enter your email"
               required
             />
+            {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
           </div>
           <div className="mb-6">
             <label className="block text-gray-400 mb-2" htmlFor="password">
@@ -64,12 +79,14 @@ const Login = () => {
               placeholder="Enter your password"
               required
             />
+            {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
           </div>
           <button
             type="submit"
-            className="w-full p-3 rounded bg-blue-500 text-white font-bold hover:bg-blue-600 transition duration-300"
+            disabled={loading}
+            className="w-full p-3 rounded bg-blue-500 text-white font-bold hover:bg-blue-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
           <div className="text-center mt-4">
             <p className="text-gray-400">

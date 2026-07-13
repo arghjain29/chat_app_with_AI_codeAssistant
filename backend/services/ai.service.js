@@ -4,7 +4,7 @@ const ApiKey = process.env.GOOGLE_AI_KEY;
 
 const genAI = new GoogleGenerativeAI(ApiKey);
 const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.1-flash-lite",
     generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.4,
@@ -13,7 +13,7 @@ const model = genAI.getGenerativeModel({
 
 Examples: 
 
-<example>
+<example1>
 user:Create an express application 
 response: {
 
@@ -81,34 +81,32 @@ response: {
 }
 }
 
-
-
-</example>
+</example1>
 
 
 
-   <example>
+<example2>
 
    user:Hello 
    response:{
    "text":"Hello, How can I help you today?"
    }
    
-   </example>
+</example2>
 
 
 <example3>
 
 user: create a sample react app
 AI : {
-    "text": "Here's the file structure for a basic React application:",
+    "text": "Here's the file structure for a basic React application using Vite:",
     "fileTree": {
         "src": {
             "file": {},
             "children": {
-                "App.js": {
+                "App.jsx": {
                     "file": {
-                        "contents": "// App.js\nimport React from 'react';\nimport './App.css';\n\nfunction App() {\n  return (\n    <div className=\"App\">\n      <header className=\"App-header\">\n        <h1>Hello React!</h1>\n        <p>This is a basic React application.</p>\n      </header>\n    </div>\n  );\n}\n\nexport default App;\n"
+                        "contents": "// App.jsx\nimport './App.css';\n\nfunction App() {\n  return (\n    <div className=\"App\">\n      <header className=\"App-header\">\n        <h1>Hello React!</h1>\n        <p>This is a basic React application.</p>\n      </header>\n    </div>\n  );\n}\n\nexport default App;\n"
                     }
                 },
                 "App.css": {
@@ -116,9 +114,9 @@ AI : {
                         "contents": "/* App.css */\n.App {\n  text-align: center;\n}\n\n.App-header {\n  background-color: #282c34;\n  min-height: 100vh;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  font-size: calc(10px + 2vmin);\n  color: white;\n}\n\n.App-link {\n  color: #61dafb;\n}\n"
                     }
                 },
-                "index.js": {
+                "main.jsx": {
                     "file": {
-                        "contents": "// index.js\nimport React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport './index.css';\nimport App from './App';\n\nconst root = ReactDOM.createRoot(document.getElementById('root'));\nroot.render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);\n"
+                        "contents": "// main.jsx\nimport React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport './index.css';\nimport App from './App.jsx';\n\nReactDOM.createRoot(document.getElementById('root')).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);\n"
                     }
                 },
                 "index.css": {
@@ -128,19 +126,19 @@ AI : {
                 }
             }
         },
-        "public": {
-            "file": {},
-            "children": {
-                "index.html": {
-                    "file": {
-                        "contents": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\" />\n    <link rel=\"icon\" href=\"%PUBLIC_URL%/favicon.ico\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <meta name=\"theme-color\" content=\"#000000\" />\n    <meta\n      name=\"description\"\n      content=\"Web site created using create-react-app\"\n    />\n    <link rel=\"apple-touch-icon\" href=\"%PUBLIC_URL%/logo192.png\" />\n    <link rel=\"manifest\" href=\"%PUBLIC_URL%/manifest.json\" />\n    <title>React App</title>\n  </head>\n  <body>\n    <noscript>You need to enable JavaScript to run this app.</noscript>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
-                    }
-                }
+        "index.html": {
+            "file": {
+                "contents": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>Vite React App</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.jsx\"></script>\n  </body>\n</html>\n"
+            }
+        },
+        "vite.config.js": {
+            "file": {
+                "contents": "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n});\n"
             }
         },
         "package.json": {
             "file": {
-                "contents": "{\n  \"name\": \"my-app\",\n  \"version\": \"0.1.0\",\n  \"private\": true,\n  \"dependencies\": {\n    \"@testing-library/jest-dom\": \"^5.17.0\",\n    \"@testing-library/react\": \"^13.4.0\",\n    \"@testing-library/user-event\": \"^13.5.0\",\n    \"react\": \"^18.2.0\",\n    \"react-dom\": \"^18.2.0\",\n    \"react-scripts\": \"5.0.1\",\n    \"web-vitals\": \"^2.1.4\"\n  },\n  \"scripts\": {\n    \"start\": \"react-scripts start\",\n    \"build\": \"react-scripts build\",\n    \"test\": \"react-scripts test\",\n    \"eject\": \"react-scripts eject\"\n  },\n  \"eslintConfig\": {\n    \"extends\": [\n      \"react-app\",\n      \"react-app/jest\"\n    ]\n  },\n  \"browserslist\": {\n    \"production\": [\n      \">0.2%\",\n      \"not dead\",\n      \"not op_mini all\"\n    ],\n    \"development\": [\n      \"last 1 chrome version\",\n      \"last 1 firefox version\",\n      \"last 1 safari version\"\n    ]\n  }\n}\n"
+                "contents": "{\n  \"name\": \"my-app\",\n  \"version\": \"0.1.0\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"vite build\",\n    \"preview\": \"vite preview\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.2.0\",\n    \"react-dom\": \"^18.2.0\"\n  },\n  \"devDependencies\": {\n    \"@vitejs/plugin-react\": \"^4.2.1\",\n    \"vite\": \"^5.1.4\"\n  }\n}\n"
             }
         }
     },
@@ -153,7 +151,8 @@ AI : {
     "startCommand": {
         "mainItem": "npm",
         "commands": [
-            "start"
+            "run",
+            "dev"
         ]
     }
 }
@@ -162,11 +161,7 @@ AI : {
 
    
 
-IMPORTANT : don't use file name like routes/index.js, don't need to send package-lock.json,
-if there are names with special characters like @testing-library/jest-dom, provide them like this - \"@testing-library/jest-dom\"
-give port number little complex , like 6455, between 6000-9000, dont give comments in .json type files.
-GIVE PROPER RESULT SO THAT IT CAN BE USED IN WEB CONTAINER.
-   
+IMPORTANT : don't use file name like routes/index.js, don't need to send package-lock.json, svg files, png files, don't use file name like .env, if there are names with special characters like @testing-library/jest-dom, provide them like this - \"@testing-library/jest-dom\", give port number little complex , like 6455, between 6000-9000, don't give comments in .json type files. GIVE PROPER RESULT SO THAT IT CAN BE USED IN WEB CONTAINER.
    
 `
 });
