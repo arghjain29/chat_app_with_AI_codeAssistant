@@ -1,6 +1,7 @@
 import { ObjectIdSchema, type AssignableRole, type Member, type Role } from '@codecollab/shared';
 import type { Types } from 'mongoose';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
+import { disconnectUser } from '../../realtime/collab.js';
 import { UserModel } from '../users/user.model.js';
 import type { ProjectAccess } from './access.js';
 import { MembershipModel } from './membership.model.js';
@@ -42,6 +43,8 @@ export async function updateMemberRole(
   }
   target.role = role;
   await target.save();
+  // Reconnect their live editors so read-only/read-write matches the new role.
+  disconnectUser(String(access.project._id), targetUserId);
 
   const user = await UserModel.findById(target.userId);
   if (!user) throw new NotFoundError('Member');
@@ -68,4 +71,5 @@ export async function removeMember(access: ProjectAccess, targetUserId: string):
     );
   }
   await target.deleteOne();
+  disconnectUser(String(project._id), targetUserId);
 }

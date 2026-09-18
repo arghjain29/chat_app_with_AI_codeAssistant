@@ -7,6 +7,8 @@ vi.mock('../src/lib/clerk.js', () => ({
   authMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
   getClerkUserId: (req: { get(name: string): string | undefined }) =>
     req.get('x-test-user') ?? null,
+  // WebSocket tokens are just the Clerk id in tests; "bad" is rejected.
+  verifySessionToken: async (token: string) => (token && token !== 'bad' ? token : null),
   fetchClerkProfile: async (clerkId: string) => ({
     clerkId,
     email: `${clerkId}@example.com`,

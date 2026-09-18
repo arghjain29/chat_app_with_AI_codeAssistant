@@ -2,12 +2,30 @@
  * The only module that talks to Clerk. Everything else depends on these
  * functions, which keeps auth swappable and easy to mock in tests.
  */
+import { verifyToken } from '@clerk/backend';
 import { clerkClient, clerkMiddleware, getAuth } from '@clerk/express';
 import type { Request, RequestHandler } from 'express';
 import { env } from '../env.js';
 
+/** Tokens minted for other sites (a different `azp`) are rejected. */
+const authorizedParties = env.FRONTEND_URL;
+
 export const authMiddleware = (): RequestHandler =>
-  clerkMiddleware({ publishableKey: env.CLERK_PUBLISHABLE_KEY, secretKey: env.CLERK_SECRET_KEY });
+  clerkMiddleware({
+    publishableKey: env.CLERK_PUBLISHABLE_KEY,
+    secretKey: env.CLERK_SECRET_KEY,
+    authorizedParties,
+  });
+
+/** Verify a raw session token (used for WebSocket connections). Returns the Clerk user id. */
+export async function verifySessionToken(token: string): Promise<string | null> {
+  try {
+    const claims = await verifyToken(token, { secretKey: env.CLERK_SECRET_KEY, authorizedParties });
+    return claims.sub ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Clerk user id of the signed-in caller, or null. */
 export const getClerkUserId = (req: Request): string | null => {

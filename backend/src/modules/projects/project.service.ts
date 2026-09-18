@@ -8,6 +8,7 @@ import {
 } from '@codecollab/shared';
 import type { Types } from 'mongoose';
 import { PlanLimitError } from '../../lib/errors.js';
+import { deleteAllFiles, seedTemplate } from '../files/file.service.js';
 import { UserModel, type UserDoc } from '../users/user.model.js';
 import type { ProjectAccess } from './access.js';
 import { InviteModel } from './invite.model.js';
@@ -92,8 +93,9 @@ export async function createProject(user: UserDoc, input: CreateProjectInput): P
   });
   try {
     await MembershipModel.create({ projectId: project._id, userId: user._id, role: 'owner' });
+    await seedTemplate(project._id, input.template ?? 'starter');
   } catch (err) {
-    await project.deleteOne();
+    await deleteProjectCascade(project);
     throw err;
   }
   return toProject(project, user, 'owner', 1);
@@ -115,10 +117,11 @@ export async function updateProject(
 
 /** Delete a project and everything that hangs off it. */
 export async function deleteProjectCascade(project: ProjectDoc): Promise<void> {
-  // Later phases add files, messages and AI usage here.
+  // Later phases add messages and AI usage here.
   await Promise.all([
     MembershipModel.deleteMany({ projectId: project._id }),
     InviteModel.deleteMany({ projectId: project._id }),
+    deleteAllFiles(project._id),
   ]);
   await project.deleteOne();
 }

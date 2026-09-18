@@ -7,6 +7,7 @@ import {
 import { Router } from 'express';
 import { currentUser, requireUser } from '../../middleware/auth.js';
 import { parseBody } from '../../middleware/validate.js';
+import { fileRouter } from '../files/file.routes.js';
 import { requireProjectAccess } from './access.js';
 import { createInvite, listActiveInvites, revokeInvite } from './invite.service.js';
 import { listMembers, removeMember, updateMemberRole } from './member.service.js';
@@ -20,6 +21,7 @@ import {
 
 export const projectRouter = Router();
 projectRouter.use(requireUser);
+projectRouter.use('/:projectId/files', fileRouter);
 
 // ---------- Projects ----------
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PLAN_IDS } from './plans.js';
+import { PROJECT_TEMPLATES } from './files.js';
 import { ROLES } from './roles.js';
 
 export const PlanIdSchema = z.enum(PLAN_IDS);
@@ -45,6 +46,8 @@ export const ProjectDescriptionSchema = z
 export const CreateProjectInputSchema = z.object({
   name: ProjectNameSchema,
   description: ProjectDescriptionSchema.optional().default(''),
+  /** Files to start with: a small runnable web app, or nothing. */
+  template: z.enum(PROJECT_TEMPLATES).optional().default('starter'),
 });
 export type CreateProjectInput = z.input<typeof CreateProjectInputSchema>;
 
