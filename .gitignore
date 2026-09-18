@@ -1,32 +1,28 @@
-# Node.js
-backend/node_modules/
-backend/npm-debug.log*
-backend/yarn-debug.log*
-backend/yarn-error.log*
+# Dependencies
+node_modules/
 
-frontend/node_modules/
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
+# Builds
+dist/
+build/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Env
+.env
+.env.*
+!.env.example
 
 # Logs
 logs/
 *.log
 
-# Environment variables
-backend/.env
-backend/.env.local
-frontend/.env
-frontend/.env.local
-
-# Build directories
-dist/
-build/
-
-# IDE specific files
+# IDE / OS
 .vscode/
 .idea/
-
-# OS specific files
 .DS_Store
 Thumbs.db
+
+# Generated
+frontend/src/routeTree.gen.ts
