@@ -125,6 +125,17 @@ function toWebRequest(req: IncomingMessage): Request {
   return new Request(`http://${req.headers.host ?? 'localhost'}${req.url ?? '/'}`, { headers });
 }
 
+/** Exact origins (scheme + host + port) of the frontend, e.g. `https://app.example.com`. */
+const allowedOrigins = new Set(
+  env.FRONTEND_URL.flatMap((u) => {
+    try {
+      return [new URL(u).origin];
+    } catch {
+      return [];
+    }
+  }),
+);
+
 /** Accept collaboration WebSockets on `COLLAB_PATH` of the existing HTTP server. */
 export function attachCollab(server: Server) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: FILE_LIMITS.maxFileBytes * 2 });
@@ -133,9 +144,10 @@ export function attachCollab(server: Server) {
     const { pathname } = new URL(req.url ?? '/', 'http://localhost');
     if (pathname !== COLLAB_PATH) return; // Other upgrade handlers (e.g. Socket.io) may claim it.
 
-    // Only our own frontend may open collaboration sockets from a browser.
+    // Browsers always send Origin: only our own frontend may connect. (Non-browser clients
+    // send none; they still need a valid session token, which is sent explicitly, not by cookie.)
     const origin = req.headers.origin;
-    if (origin && !env.FRONTEND_URL.includes(origin)) {
+    if (origin && !allowedOrigins.has(origin)) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
