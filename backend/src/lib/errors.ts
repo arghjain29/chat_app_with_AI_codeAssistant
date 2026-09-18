@@ -47,3 +47,9 @@ export class PlanLimitError extends AppError {
     super(402, 'PLAN_LIMIT', message, details);
   }
 }
+
+export class GoneError extends AppError {
+  constructor(message: string) {
+    super(410, 'GONE', message);
+  }
+}

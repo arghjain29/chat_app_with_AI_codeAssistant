@@ -10,6 +10,8 @@ import { logger } from './lib/logger.js';
 import { isRedisReady } from './lib/redis.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { requestId } from './middleware/requestId.js';
+import { inviteRouter } from './modules/projects/invite.routes.js';
+import { projectRouter } from './modules/projects/project.routes.js';
 import { userRouter } from './modules/users/user.routes.js';
 import { clerkWebhookRouter } from './modules/webhooks/clerk.routes.js';
 
@@ -70,6 +72,8 @@ export function createApp(): Express {
   api.use(apiLimiter);
   api.use(authMiddleware());
   api.use('/users', userRouter);
+  api.use('/projects', projectRouter);
+  api.use('/invites', inviteRouter);
   app.use('/api/v1', api);
 
   app.use(notFound);

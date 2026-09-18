@@ -2,6 +2,9 @@ import { randomBytes } from 'node:crypto';
 import type { Me } from '@codecollab/shared';
 import { fetchClerkProfile, type ClerkProfile } from '../../lib/clerk.js';
 import { logger } from '../../lib/logger.js';
+import { MembershipModel } from '../projects/membership.model.js';
+import { ProjectModel } from '../projects/project.model.js';
+import { deleteProjectCascade } from '../projects/project.service.js';
 import { UserModel, type UserDoc } from './user.model.js';
 
 const USERNAME_MAX = 24;
@@ -64,8 +67,14 @@ export async function findOrCreateUserByClerkId(clerkId: string): Promise<UserDo
 }
 
 export async function deleteUserByClerkId(clerkId: string): Promise<void> {
-  // Later phases cascade to memberships, owned projects and subscriptions here.
-  await UserModel.deleteOne({ clerkId });
+  const user = await UserModel.findOne({ clerkId });
+  if (!user) return;
+  // Owned projects go with the account; memberships elsewhere are simply removed.
+  const owned = await ProjectModel.find({ ownerId: user._id });
+  for (const project of owned) await deleteProjectCascade(project);
+  await MembershipModel.deleteMany({ userId: user._id });
+  // Later phases also cancel the Stripe subscription here.
+  await user.deleteOne();
 }
 
 export const toMe = (user: UserDoc): Me => ({

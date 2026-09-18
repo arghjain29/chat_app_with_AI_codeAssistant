@@ -4,6 +4,7 @@ export const ERROR_CODES = [
   'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
+  'GONE',
   'RATE_LIMITED',
   'PLAN_LIMIT',
   'INTERNAL_ERROR',
