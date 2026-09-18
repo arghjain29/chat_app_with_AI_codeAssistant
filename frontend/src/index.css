@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource-variable/jetbrains-mono';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Palette: cool slate paper, navy ink, cobalt for actions.
+ * Presence colours (marigold, teal, rose) identify collaborators and are the only accents.
+ */
+:root {
+  --paper: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #e4e8ef;
+  --ink: #1b2233;
+  --ink-muted: #56607a;
+  --line: #cdd4df;
+  --cobalt: #2f5bea;
+  --cobalt-ink: #ffffff;
+  --danger: #c8333f;
+  --marigold: #f2b632;
+  --teal: #1f9e8f;
+  --rose: #e0527a;
+  --ring: #2f5bea;
+}
+
+.dark {
+  --paper: #141a26;
+  --surface: #1c2433;
+  --surface-2: #252f42;
+  --ink: #e6eaf2;
+  --ink-muted: #9aa4ba;
+  --line: #313c52;
+  --cobalt: #6d8cff;
+  --cobalt-ink: #0f1522;
+  --danger: #ff6b76;
+  --ring: #6d8cff;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-cobalt: var(--cobalt);
+  --color-cobalt-ink: var(--cobalt-ink);
+  --color-danger: var(--danger);
+  --color-marigold: var(--marigold);
+  --color-teal: var(--teal);
+  --color-rose: var(--rose);
+  --color-ring: var(--ring);
+
+  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

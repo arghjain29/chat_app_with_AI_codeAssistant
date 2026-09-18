@@ -26,7 +26,10 @@ describe('GET /api/v1/users/me', () => {
   });
 
   it('creates the local user on first sign-in and returns it', async () => {
-    const res = await request(app).get('/api/v1/users/me').set('x-test-user', 'user_alice').expect(200);
+    const res = await request(app)
+      .get('/api/v1/users/me')
+      .set('x-test-user', 'user_alice')
+      .expect(200);
     expect(res.body).toMatchObject({ email: 'user_alice@example.com', plan: 'free' });
     expect(await UserModel.countDocuments()).toBe(1);
 
@@ -36,7 +39,10 @@ describe('GET /api/v1/users/me', () => {
 
   it('gives colliding usernames a unique suffix', async () => {
     await UserModel.create({ clerkId: 'other', email: 'x@example.com', username: 'user_bob' });
-    const res = await request(app).get('/api/v1/users/me').set('x-test-user', 'user_bob').expect(200);
+    const res = await request(app)
+      .get('/api/v1/users/me')
+      .set('x-test-user', 'user_bob')
+      .expect(200);
     expect(res.body.username).not.toBe('user_bob');
     expect(res.body.username).toMatch(/^user_bob-/);
   });

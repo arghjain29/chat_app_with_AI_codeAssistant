@@ -15,12 +15,23 @@ const EnvSchema = z.object({
   FRONTEND_URL: z
     .string()
     .min(1)
-    .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean)),
+    .transform((v) =>
+      v
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean),
+    ),
   MONGO_URI: z.string().min(1),
-  REDIS_URL: z.string().optional().transform((v) => v || undefined),
+  REDIS_URL: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
-  CLERK_WEBHOOK_SIGNING_SECRET: z.string().optional().transform((v) => v || undefined),
+  CLERK_WEBHOOK_SIGNING_SECRET: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Code together in real time, with an AI pair-programmer your whole team can see."
+    />
+    <meta name="theme-color" content="#EEF1F5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141A26" media="(prefers-color-scheme: dark)" />
+    <title>CodeCollab</title>
+    <script>
+      try {
+        const t = localStorage.getItem('theme');
+        const dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', dark);
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

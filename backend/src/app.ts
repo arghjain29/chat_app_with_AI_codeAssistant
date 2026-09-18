@@ -57,7 +57,11 @@ export function createApp(): Express {
     legacyHeaders: false,
     handler: (req, res) => {
       res.status(429).json({
-        error: { code: 'RATE_LIMITED', message: 'Too many requests, slow down', requestId: String(req.id) },
+        error: {
+          code: 'RATE_LIMITED',
+          message: 'Too many requests, slow down',
+          requestId: String(req.id),
+        },
       });
     },
   });

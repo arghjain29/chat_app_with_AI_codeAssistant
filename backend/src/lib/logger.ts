@@ -6,5 +6,7 @@ export const logger = pino({
   redact: ['req.headers.authorization', 'req.headers.cookie'],
   ...(isProd || env.NODE_ENV === 'test'
     ? {}
-    : { transport: { target: 'pino-pretty', options: { colorize: true, ignore: 'pid,hostname' } } }),
+    : {
+        transport: { target: 'pino-pretty', options: { colorize: true, ignore: 'pid,hostname' } },
+      }),
 });

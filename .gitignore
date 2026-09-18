@@ -26,3 +26,4 @@ Thumbs.db
 
 # Generated
 frontend/src/routeTree.gen.ts
+*.stackdump
