@@ -34,7 +34,9 @@ declare module '@tanstack/react-router' {
 function App() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
 
-  useEffect(() => setTokenGetter(() => getToken()), [getToken]);
+  // Set during render, not in an effect: route loaders fire from the router's own
+  // (child) effects, which run before this component's effects would.
+  setTokenGetter(() => getToken());
 
   // Re-run route guards whenever the session changes (sign in / sign out).
   useEffect(() => {

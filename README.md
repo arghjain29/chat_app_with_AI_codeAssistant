@@ -9,8 +9,8 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 | Phase | Scope                                                                            | Status |
 | ----- | -------------------------------------------------------------------------------- | ------ |
 | 0     | Foundation: TypeScript workspace, Clerk auth, API skeleton, CI                   | Done   |
-| 1     | Projects, roles (owner/editor/viewer), invite links, plan limits                 | Next   |
-| 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            |        |
+| 1     | Projects, roles (owner/editor/viewer), invite links, plan limits                 | Done   |
+| 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Next   |
 | 3     | Persistent chat: threads, reactions, mentions, unread                            |        |
 | 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection |        |
 | 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                |        |
