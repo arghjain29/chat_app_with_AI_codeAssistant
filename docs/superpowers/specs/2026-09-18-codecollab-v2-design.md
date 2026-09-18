@@ -116,6 +116,7 @@ Limits are enforced on the backend (the source of truth). The UI reads the same 
 - Socket rate limit: 10 messages / 10 s per user.
 
 ### 5. AI gateway (`backend/src/ai/`)
+- **Language-agnostic** (decided 2026-09-18): the assistant helps with code in any language, not only MERN as in v1. Its prompts must not assume a stack. Running stays limited to what WebContainer supports (see the runtime detection in `frontend/src/features/workspace/runtime.ts`), and the AI should say so rather than promise that non-JS code runs.
 - `gateway.ts` exposes `runAi({ task, projectId, userId, messages, context })`. Built on the **Vercel AI SDK** (`ai`, `@ai-sdk/google`, `@ai-sdk/anthropic`, `@ai-sdk/openai`).
 - `models.ts` maps each plan tier + task to an ordered provider/model list, for example `chat.fast → [gemini-flash-lite, claude-haiku]`. Failover moves to the next model on timeout, 429 or 5xx. Providers without an API key are skipped, so a single Gemini key is enough to run everything.
 - **Streaming to the room.** Tokens stream over Socket.io (`ai:delta`, `ai:done`, `ai:error`) so every collaborator watches the answer form. The final message is persisted with its metadata.

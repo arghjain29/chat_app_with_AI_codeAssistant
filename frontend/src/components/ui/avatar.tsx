@@ -10,11 +10,17 @@ const PRESENCE = [
   'bg-cobalt text-cobalt-ink',
 ];
 
-export const presenceClass = (id: string) => {
+/** Same order as PRESENCE, as raw colours for places classes can't reach (editor cursors). */
+export const PRESENCE_HEX = ['#f2b632', '#1f9e8f', '#e0527a', '#2f5bea'] as const;
+
+const presenceIndex = (id: string) => {
   let h = 0;
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return PRESENCE[h % PRESENCE.length]!;
+  return h % PRESENCE.length;
 };
+
+export const presenceClass = (id: string) => PRESENCE[presenceIndex(id)]!;
+export const presenceHex = (id: string) => PRESENCE_HEX[presenceIndex(id)]!;
 
 export function Avatar({
   user,

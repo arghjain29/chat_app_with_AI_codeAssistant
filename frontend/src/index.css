@@ -24,6 +24,16 @@
   --teal: #1f9e8f;
   --rose: #e0527a;
   --ring: #2f5bea;
+
+  /* Syntax colours for the code editor */
+  --syn-keyword: #6a3fd4;
+  --syn-string: #1a7f4b;
+  --syn-number: #b35c00;
+  --syn-comment: #7a8398;
+  --syn-function: #2f5bea;
+  --syn-type: #b0306a;
+  --syn-property: #0f6f8f;
+  --syn-invalid: #c8333f;
 }
 
 .dark {
@@ -37,6 +47,15 @@
   --cobalt-ink: #0f1522;
   --danger: #ff6b76;
   --ring: #6d8cff;
+
+  --syn-keyword: #b89cff;
+  --syn-string: #7fd6a4;
+  --syn-number: #ffb877;
+  --syn-comment: #7d879d;
+  --syn-function: #8aa6ff;
+  --syn-type: #ff8fbf;
+  --syn-property: #7fd3ea;
+  --syn-invalid: #ff6b76;
 }
 
 @theme inline {

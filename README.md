@@ -10,8 +10,8 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 | ----- | -------------------------------------------------------------------------------- | ------ |
 | 0     | Foundation: TypeScript workspace, Clerk auth, API skeleton, CI                   | Done   |
 | 1     | Projects, roles (owner/editor/viewer), invite links, plan limits                 | Done   |
-| 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Next   |
-| 3     | Persistent chat: threads, reactions, mentions, unread                            |        |
+| 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Done   |
+| 3     | Persistent chat: threads, reactions, mentions, unread                            | Next   |
 | 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection |        |
 | 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                |        |
 | 6     | Polish: landing page, onboarding, Sentry, Playwright e2e, deploy                 |        |
@@ -50,6 +50,23 @@ The Clerk webhook (`POST /webhooks/clerk`, events `user.*`) keeps profile change
 | `npm run typecheck` | TypeScript checks for every workspace                 |
 | `npm test`          | Vitest suites (the backend uses an in-memory MongoDB) |
 | `npm run format`    | Prettier                                              |
+
+## Running projects in the browser
+
+Projects run inside [WebContainer](https://webcontainers.io) (Node.js in the browser), on each person's own machine. What **Run** does depends on the files:
+
+| Project has                                   | Run does                                             |
+| --------------------------------------------- | ---------------------------------------------------- |
+| `package.json` with a `dev` or `start` script | `npm install`, then that script, with a live preview |
+| `index.html` (no `package.json`)              | Serves the files as a static site                    |
+| `index.js` / `main.js` / `server.js`          | `node <file>` in the terminal                        |
+| Anything else (Python, Java, Go, …)           | Edit-only: code can be edited together, but not run  |
+
+WebContainer needs a cross-origin isolated page (`COOP: same-origin`, `COEP: credentialless`, set in `vite.config.ts` and `vercel.json`) and works in Chrome, Edge and Firefox. WebContainer is free for personal, open-source and prototype use; commercial production use needs a [StackBlitz license](https://webcontainers.io/enterprise).
+
+## Real-time collaboration
+
+Each file is a Yjs document served by Hocuspocus at `ws(s)://<api>/collab`, on the same server as the API. Connections authenticate with the Clerk session token; viewers connect read-only. Edits are saved to MongoDB about 2 seconds after typing stops (at most every 10 seconds while typing continues).
 
 ## API conventions
 

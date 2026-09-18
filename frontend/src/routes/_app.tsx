@@ -22,7 +22,8 @@ export const Route = createFileRoute('/_app')({
 
 function AppLayout() {
   return (
-    <div className="flex min-h-dvh flex-col">
+    // Pages that hold the workspace get exactly one screen of height, so panels scroll inside.
+    <div className="flex min-h-dvh flex-col has-[[data-workspace]]:h-dvh">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-6">
@@ -43,7 +44,7 @@ function AppLayout() {
           </div>
         </div>
       </header>
-      <main className="flex-1">
+      <main className="flex min-h-0 flex-1 flex-col">
         <Outlet />
       </main>
     </div>

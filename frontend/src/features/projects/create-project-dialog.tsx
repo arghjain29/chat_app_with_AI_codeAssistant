@@ -11,8 +11,18 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { ApiError } from '@/lib/api';
 import { useCreateProject } from './api';
+
+const TEMPLATE_OPTIONS = [
+  {
+    value: 'starter',
+    label: 'Starter web page',
+    description: 'HTML, CSS and JavaScript you can run right away',
+  },
+  { value: 'blank', label: 'Empty project', description: 'No files. Bring any language.' },
+] as const;
 
 export function CreateProjectDialog({ trigger }: { trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -80,6 +90,14 @@ export function CreateProjectDialog({ trigger }: { trigger: ReactNode }) {
               aria-describedby={
                 errors.description ? 'project-description-error' : 'project-description-hint'
               }
+            />
+          </Field>
+          <Field id="project-template" label="Start with">
+            <Select
+              id="project-template"
+              name="template"
+              defaultValue="starter"
+              options={TEMPLATE_OPTIONS}
             />
           </Field>
           {errors.form && (

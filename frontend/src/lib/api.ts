@@ -9,6 +9,9 @@ export const setTokenGetter = (fn: TokenGetter) => {
   getToken = fn;
 };
 
+/** Current Clerk session token, for connections that don't go through `api()`. */
+export const getAuthToken = () => getToken();
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,

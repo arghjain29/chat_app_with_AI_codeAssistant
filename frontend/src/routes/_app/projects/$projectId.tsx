@@ -36,7 +36,7 @@ function ProjectLayout() {
   }
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-4">
           <div className="flex min-w-0 items-center gap-3">

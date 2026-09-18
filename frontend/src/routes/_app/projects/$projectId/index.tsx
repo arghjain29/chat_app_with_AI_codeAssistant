@@ -1,27 +1,20 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { Code2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import { useMe } from '@/features/auth/use-me';
+import { projectQuery } from '@/features/projects/api';
+import { filesQuery } from '@/features/workspace/files-api';
+import { Workspace } from '@/features/workspace/workspace';
 
 export const Route = createFileRoute('/_app/projects/$projectId/')({
-  component: Workspace,
+  loader: ({ context, params }) => context.queryClient.prefetchQuery(filesQuery(params.projectId)),
+  component: WorkspaceRoute,
 });
 
-/** Replaced by the collaborative editor in the next phase. */
-function Workspace() {
+function WorkspaceRoute() {
   const { projectId } = Route.useParams();
-  return (
-    <div className="mx-auto grid max-w-md place-items-center px-4 py-24 text-center">
-      <Code2 className="size-10 text-ink-muted" aria-hidden />
-      <h2 className="mt-4 font-display text-xl font-semibold">The editor is on its way</h2>
-      <p className="mt-2 text-ink-muted">
-        Shared files, live cursors and in-browser previews come in the next update. For now you can
-        invite your team from settings.
-      </p>
-      <Button asChild variant="secondary" className="mt-6">
-        <Link to="/projects/$projectId/settings" params={{ projectId }}>
-          Open settings
-        </Link>
-      </Button>
-    </div>
-  );
+  const { data: project } = useQuery(projectQuery(projectId));
+  const { data: me } = useMe();
+  // The parent layout shows loading and error states for the project.
+  if (!project || !me) return <div className="flex-1 animate-pulse bg-surface" />;
+  return <Workspace key={project.id} project={project} me={me} />;
 }
