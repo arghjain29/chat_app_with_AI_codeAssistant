@@ -8,6 +8,7 @@ import {
 } from '@codecollab/shared';
 import type { Types } from 'mongoose';
 import { PlanLimitError } from '../../lib/errors.js';
+import { deleteProjectMessages, unreadCounts } from '../chat/chat.service.js';
 import { deleteAllFiles, seedTemplate } from '../files/file.service.js';
 import { UserModel, type UserDoc } from '../users/user.model.js';
 import type { ProjectAccess } from './access.js';
@@ -45,11 +46,12 @@ async function memberCounts(projectIds: Types.ObjectId[]): Promise<Map<string, n
 /** Serialize one project for a given caller role. */
 export async function presentProject(access: ProjectAccess): Promise<Project> {
   const { project, membership } = access;
-  const [owner, count] = await Promise.all([
+  const [owner, count, unread] = await Promise.all([
     UserModel.findById(project.ownerId),
     MembershipModel.countDocuments({ projectId: project._id }),
+    unreadCounts(membership.userId, [project._id]),
   ]);
-  return toProject(project, owner, membership.role, count);
+  return toProject(project, owner, membership.role, count, unread.get(project.id) ?? 0);
 }
 
 export async function listProjectsForUser(userId: Types.ObjectId): Promise<Project[]> {
@@ -59,9 +61,13 @@ export async function listProjectsForUser(userId: Types.ObjectId): Promise<Proje
   const projects = await ProjectModel.find({ _id: { $in: [...roleByProject.keys()] } }).sort({
     updatedAt: -1,
   });
-  const [owners, counts] = await Promise.all([
+  const [owners, counts, unread] = await Promise.all([
     UserModel.find({ _id: { $in: projects.map((p) => p.ownerId) } }),
     memberCounts(projects.map((p) => p._id)),
+    unreadCounts(
+      userId,
+      projects.map((p) => p._id),
+    ),
   ]);
   const ownerById = new Map(owners.map((o) => [o.id as string, o]));
 
@@ -71,6 +77,7 @@ export async function listProjectsForUser(userId: Types.ObjectId): Promise<Proje
       ownerById.get(p.ownerId.toString()) ?? null,
       roleByProject.get(p.id)!,
       counts.get(p.id) ?? 0,
+      unread.get(p.id) ?? 0,
     ),
   );
 }
@@ -117,8 +124,9 @@ export async function updateProject(
 
 /** Delete a project and everything that hangs off it. */
 export async function deleteProjectCascade(project: ProjectDoc): Promise<void> {
-  // Later phases add messages and AI usage here.
+  // Later phases add AI usage here.
   await Promise.all([
+    deleteProjectMessages(project._id),
     MembershipModel.deleteMany({ projectId: project._id }),
     InviteModel.deleteMany({ projectId: project._id }),
     deleteAllFiles(project._id),

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Me } from '@codecollab/shared';
 import { fetchClerkProfile, type ClerkProfile } from '../../lib/clerk.js';
 import { logger } from '../../lib/logger.js';
+import { ReadStateModel } from '../chat/message.model.js';
 import { MembershipModel } from '../projects/membership.model.js';
 import { ProjectModel } from '../projects/project.model.js';
 import { deleteProjectCascade } from '../projects/project.service.js';
@@ -73,6 +74,8 @@ export async function deleteUserByClerkId(clerkId: string): Promise<void> {
   const owned = await ProjectModel.find({ ownerId: user._id });
   for (const project of owned) await deleteProjectCascade(project);
   await MembershipModel.deleteMany({ userId: user._id });
+  // Their messages stay in other projects' history, shown as from a deleted user.
+  await ReadStateModel.deleteMany({ userId: user._id });
   // Later phases also cancel the Stripe subscription here.
   await user.deleteOne();
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ChatMessage } from './chat.js';
 
 export const FILE_LIMITS = {
   maxEntriesPerProject: 500,
@@ -77,11 +78,17 @@ export const FILE_TEXT_KEY = 'content';
 
 /** Stateless messages the server broadcasts on a project document. */
 export type ProjectEvent =
-  { type: 'files-changed' } | { type: 'file-deleted'; fileId: string } | { type: 'access-changed' };
+  | { type: 'files-changed' }
+  | { type: 'file-deleted'; fileId: string }
+  | { type: 'access-changed' }
+  /** A chat message was created or changed; clients upsert it by id. */
+  | { type: 'message'; message: ChatMessage };
 
 /** What each collaborator publishes through Yjs awareness. */
 export interface PresenceState {
   user: { id: string; name: string; color: string; avatarUrl: string | null };
   /** File the person is looking at, if any. */
   fileId?: string | null;
+  /** Set while composing a chat message: 'main' or the thread's root message id. */
+  typing?: { in: string; at: number } | null;
 }

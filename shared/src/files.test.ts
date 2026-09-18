@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { extractMentionNames } from './chat.js';
 import { FilePathSchema, parseDocName } from './files.js';
 
 describe('FilePathSchema', () => {
@@ -24,5 +25,14 @@ describe('parseDocName', () => {
     expect(parseDocName('project:0123456789abcdef01234567')?.kind).toBe('project');
     expect(parseDocName('file:nope')).toBeNull();
     expect(parseDocName('other:0123456789abcdef01234567')).toBeNull();
+  });
+});
+
+describe('extractMentionNames', () => {
+  it('finds @names once each, ignoring emails', () => {
+    expect(extractMentionNames('hey @Maya and @dev, ping @maya — mail me@x.com')).toEqual([
+      'maya',
+      'dev',
+    ]);
   });
 });

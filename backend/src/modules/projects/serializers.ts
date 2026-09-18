@@ -27,6 +27,7 @@ export const toProject = (
   owner: UserLike | null,
   role: Role,
   memberCount: number,
+  unreadCount = 0,
 ): Project => ({
   id: p.id,
   name: p.name,
@@ -35,6 +36,7 @@ export const toProject = (
   owner: owner ? toUserSummary(owner) : deletedUser(p.ownerId),
   role,
   memberCount,
+  unreadCount,
   createdAt: p.createdAt.toISOString(),
   updatedAt: p.updatedAt.toISOString(),
 });

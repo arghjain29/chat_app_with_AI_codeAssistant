@@ -66,6 +66,8 @@ export const ProjectSchema = z.object({
   /** The caller's role in this project. */
   role: RoleSchema,
   memberCount: z.number().int(),
+  /** Chat messages from others since the caller last read the chat. */
+  unreadCount: z.number().int(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
