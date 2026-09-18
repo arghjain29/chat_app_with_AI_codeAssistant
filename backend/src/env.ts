@@ -8,6 +8,12 @@ if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   }
 }
 
+/** Optional string where an empty value (`FOO=`) counts as unset. */
+const optionalString = z
+  .string()
+  .optional()
+  .transform((v) => v || undefined);
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -22,16 +28,19 @@ const EnvSchema = z.object({
         .filter(Boolean),
     ),
   MONGO_URI: z.string().min(1),
-  REDIS_URL: z
-    .string()
+  // Redis: either a full REDIS_URL, or the host/port/password shown in the provider dashboard.
+  REDIS_URL: optionalString,
+  REDIS_HOST: optionalString,
+  REDIS_PORT: z.coerce.number().int().positive().optional(),
+  REDIS_USERNAME: optionalString,
+  REDIS_PASSWORD: optionalString,
+  REDIS_TLS: z
+    .enum(['true', 'false'])
     .optional()
-    .transform((v) => v || undefined),
+    .transform((v) => v === 'true'),
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
-  CLERK_WEBHOOK_SIGNING_SECRET: z
-    .string()
-    .optional()
-    .transform((v) => v || undefined),
+  CLERK_WEBHOOK_SIGNING_SECRET: optionalString,
 });
 
 const parsed = EnvSchema.safeParse(process.env);
