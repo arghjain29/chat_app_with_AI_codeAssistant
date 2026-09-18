@@ -24,3 +24,10 @@ export const ROLE_HINT = {
   editor: 'Can edit files, chat and use AI',
   viewer: 'Can read files and chat',
 } as const;
+
+/** Choices for roles that can be given to someone other than the owner. */
+export const ROLE_OPTIONS = (['editor', 'viewer'] as const).map((role) => ({
+  value: role,
+  label: ROLE_LABEL[role],
+  description: ROLE_HINT[role],
+}));

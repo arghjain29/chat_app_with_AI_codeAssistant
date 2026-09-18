@@ -9,33 +9,37 @@ import { Check, Copy, Link2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Select } from '@/components/ui/input';
-import { relativeTime, ROLE_HINT, ROLE_LABEL } from '@/lib/format';
+import { Field, Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { relativeTime, ROLE_LABEL, ROLE_OPTIONS } from '@/lib/format';
 import { invitesQuery, useCreateInvite, useRevokeInvite } from '../api';
 import { Section } from './section';
 
 const inviteUrl = (token: string) => `${window.location.origin}/invite/${token}`;
 
-const EXPIRY_LABEL: Record<(typeof INVITE_EXPIRY_DAYS)[number], string> = {
-  1: '1 day',
-  7: '7 days',
-  30: '30 days',
-};
+type ExpiryDays = (typeof INVITE_EXPIRY_DAYS)[number];
+
+const EXPIRY_OPTIONS = INVITE_EXPIRY_DAYS.map((d) => ({
+  value: String(d) as `${ExpiryDays}`,
+  label: d === 1 ? '1 day' : `${d} days`,
+}));
 
 export function InvitesSection({ project }: { project: Project }) {
   const { data: invites } = useQuery(invitesQuery(project.id));
   const create = useCreateInvite(project.id);
   const revoke = useRevokeInvite(project.id);
   const [created, setCreated] = useState<CreatedInvite | null>(null);
+  const [role, setRole] = useState<AssignableRole>('editor');
+  const [expires, setExpires] = useState<`${ExpiryDays}`>('7');
+  const [singleUse, setSingleUse] = useState(false);
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
     create.mutate(
       {
-        role: form.get('role') as AssignableRole,
-        expiresInDays: Number(form.get('expires')) as (typeof INVITE_EXPIRY_DAYS)[number],
-        maxUses: form.get('single') ? 1 : null,
+        role,
+        expiresInDays: Number(expires) as ExpiryDays,
+        maxUses: singleUse ? 1 : null,
       },
       { onSuccess: setCreated },
     );
@@ -49,26 +53,24 @@ export function InvitesSection({ project }: { project: Project }) {
       <form onSubmit={onSubmit} className="grid gap-4 rounded-xl border border-line bg-surface p-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="invite-role" label="Joins as">
-            <Select id="invite-role" name="role" defaultValue="editor">
-              {(['editor', 'viewer'] as const).map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABEL[r]}: {ROLE_HINT[r].toLowerCase()}
-                </option>
-              ))}
-            </Select>
+            <Select id="invite-role" options={ROLE_OPTIONS} value={role} onValueChange={setRole} />
           </Field>
           <Field id="invite-expires" label="Expires after">
-            <Select id="invite-expires" name="expires" defaultValue="7">
-              {INVITE_EXPIRY_DAYS.map((d) => (
-                <option key={d} value={d}>
-                  {EXPIRY_LABEL[d]}
-                </option>
-              ))}
-            </Select>
+            <Select
+              id="invite-expires"
+              options={EXPIRY_OPTIONS}
+              value={expires}
+              onValueChange={setExpires}
+            />
           </Field>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="single" className="size-4 accent-cobalt" />
+          <input
+            type="checkbox"
+            checked={singleUse}
+            onChange={(e) => setSingleUse(e.target.checked)}
+            className="size-4 accent-cobalt"
+          />
           Single use: the link stops working after one person joins
         </label>
         <div className="flex justify-end">

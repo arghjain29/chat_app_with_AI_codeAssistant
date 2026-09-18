@@ -13,9 +13,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Select } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useMe } from '@/features/auth/use-me';
-import { relativeTime, ROLE_HINT, ROLE_LABEL } from '@/lib/format';
+import { relativeTime, ROLE_LABEL, ROLE_OPTIONS } from '@/lib/format';
 import { membersQuery, useLeaveProject, useRemoveMember, useUpdateMemberRole } from '../api';
 import { Section } from './section';
 
@@ -67,18 +67,14 @@ export function MembersSection({ project }: { project: Project }) {
                 <>
                   <Select
                     aria-label={`Role for ${m.username}`}
-                    value={m.role}
-                    onChange={(e) =>
-                      updateRole.mutate({ userId: m.id, role: e.target.value as AssignableRole })
-                    }
-                    className="h-9 w-28"
-                  >
-                    {(['editor', 'viewer'] as const).map((r) => (
-                      <option key={r} value={r} title={ROLE_HINT[r]}>
-                        {ROLE_LABEL[r]}
-                      </option>
-                    ))}
-                  </Select>
+                    options={ROLE_OPTIONS}
+                    value={m.role as AssignableRole}
+                    onValueChange={(role) => {
+                      if (role !== m.role) updateRole.mutate({ userId: m.id, role });
+                    }}
+                    size="sm"
+                    className="w-28"
+                  />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label={`More for ${m.username}`}>

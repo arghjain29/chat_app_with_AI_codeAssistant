@@ -12,10 +12,6 @@ export function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
   return <textarea className={cn(fieldBase, 'min-h-20 resize-y py-2', className)} {...props} />;
 }
 
-export function Select({ className, ...props }: ComponentProps<'select'>) {
-  return <select className={cn(fieldBase, 'h-10 pr-8', className)} {...props} />;
-}
-
 export function Label({ className, ...props }: ComponentProps<'label'>) {
   return <label className={cn('text-sm font-medium', className)} {...props} />;
 }
