@@ -1,10 +1,12 @@
 import type { FileEntry, Me, Project } from '@codecollab/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Code2, Eye, WifiOff, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { setUnread, upsertMessage } from '../chat/chat-api';
+import { ChatPanel } from '../chat/chat-panel';
 import { CodeEditor } from './code-editor';
 import { FileTree } from './file-tree';
 import { filesQuery } from './files-api';
@@ -98,10 +100,32 @@ export function Workspace({ project, me }: { project: Project; me: Me }) {
   const canEdit = project.role !== 'viewer';
   const { data: files = [], isPending } = useQuery(filesQuery(project.id));
   const { open, active, openTab, closeTab, setActive } = useTabs(project.id);
-  const { peers, connected } = useProjectRoom(project.id, me, active, closeTab);
+  const qc = useQueryClient();
   const run = useRef<RunPanelHandle>(null);
   const isDesktop = useIsDesktop();
-  const [mobileView, setMobileView] = useState<'files' | 'code' | 'run'>('code');
+  const [mobileView, setMobileView] = useState<'files' | 'code' | 'chat' | 'run'>('code');
+  const [sideView, setSideView] = useState<'chat' | 'run'>('chat');
+  const chatVisible = isDesktop ? sideView === 'chat' : mobileView === 'chat';
+
+  // Count a message as unread only the first time it arrives, if it's someone else's,
+  // new, and the chat isn't on screen.
+  const seen = useRef(new Set<string>());
+  const chatVisibleRef = useRef(chatVisible);
+  useEffect(() => {
+    chatVisibleRef.current = chatVisible;
+  });
+  const { peers, connected, setTyping } = useProjectRoom(project.id, me, active, {
+    onFileDeleted: closeTab,
+    onMessage: (message) => {
+      upsertMessage(qc, message);
+      const firstSight = !seen.current.has(message.id);
+      seen.current.add(message.id);
+      const fresh = !message.editedAt && !message.deletedAt && message.replyCount === 0;
+      if (firstSight && fresh && message.author?.id !== me.id && !chatVisibleRef.current) {
+        setUnread(qc, project.id, (n) => n + 1);
+      }
+    },
+  });
 
   const byId = useMemo(() => new Map(files.map((f) => [f.id, f])), [files]);
 
@@ -223,32 +247,74 @@ export function Workspace({ project, me }: { project: Project; me: Me }) {
   );
 
   const runPanel = <RunPanel ref={run} projectId={project.id} />;
+  const chatPanel = (
+    <ChatPanel project={project} me={me} visible={chatVisible} peers={peers} onTyping={setTyping} />
+  );
+  const unread = project.unreadCount > 0 && (
+    <span className="ml-1.5 rounded-full bg-cobalt px-1.5 text-[10px] leading-4 font-semibold text-cobalt-ink tabular-nums">
+      {project.unreadCount > 99 ? '99+' : project.unreadCount}
+      <span className="sr-only"> unread</span>
+    </span>
+  );
+
+  const side = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex gap-1 border-b border-line bg-surface px-2 pt-1.5" role="tablist">
+        {(['chat', 'run'] as const).map((v) => (
+          <button
+            key={v}
+            role="tab"
+            aria-selected={sideView === v}
+            onClick={() => setSideView(v)}
+            className={cn(
+              'flex items-center border-b-2 px-3 pb-1.5 text-sm capitalize',
+              sideView === v
+                ? 'border-cobalt font-medium text-ink'
+                : 'border-transparent text-ink-muted hover:text-ink',
+            )}
+          >
+            {v}
+            {v === 'chat' && sideView !== 'chat' && unread}
+          </button>
+        ))}
+      </div>
+      {/* Both stay mounted: a running project keeps running while you chat. */}
+      <div className="relative min-h-0 flex-1">
+        <div className={cn('absolute inset-0', sideView !== 'chat' && 'hidden')}>{chatPanel}</div>
+        <div className={cn('absolute inset-0', sideView !== 'run' && 'hidden')}>{runPanel}</div>
+      </div>
+    </div>
+  );
 
   if (!isDesktop) {
     return (
       <div data-workspace className="flex min-h-0 flex-1 flex-col">
         <div className="flex border-b border-line bg-surface p-1 text-sm" role="tablist">
-          {(['files', 'code', 'run'] as const).map((v) => (
+          {(['files', 'code', 'chat', 'run'] as const).map((v) => (
             <button
               key={v}
               role="tab"
               aria-selected={mobileView === v}
               onClick={() => setMobileView(v)}
               className={cn(
-                'flex-1 rounded-md py-1.5 capitalize',
+                'flex flex-1 items-center justify-center rounded-md py-1.5 capitalize',
                 mobileView === v ? 'bg-surface-2 font-medium' : 'text-ink-muted',
               )}
             >
               {v}
+              {v === 'chat' && mobileView !== 'chat' && unread}
             </button>
           ))}
         </div>
         <div className="relative min-h-[60dvh] flex-1">
-          {/* Keep all three mounted so the editor and a running project survive switching. */}
+          {/* Keep all panels mounted so the editor and a running project survive switching. */}
           <div className={cn('absolute inset-0 bg-surface', mobileView !== 'files' && 'hidden')}>
             {tree}
           </div>
           <div className={cn('absolute inset-0', mobileView !== 'code' && 'hidden')}>{editor}</div>
+          <div className={cn('absolute inset-0', mobileView !== 'chat' && 'hidden')}>
+            {chatPanel}
+          </div>
           <div className={cn('absolute inset-0', mobileView !== 'run' && 'hidden')}>{runPanel}</div>
         </div>
       </div>
@@ -271,8 +337,8 @@ export function Workspace({ project, me }: { project: Project; me: Me }) {
         {editor}
       </Panel>
       <Separator className="w-px bg-line transition-colors hover:bg-cobalt data-[separator=active]:bg-cobalt" />
-      <Panel id="run" defaultSize="35" minSize="20">
-        {runPanel}
+      <Panel id="side" defaultSize="35" minSize="22">
+        {side}
       </Panel>
     </Group>
   );

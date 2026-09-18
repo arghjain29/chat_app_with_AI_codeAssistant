@@ -1,6 +1,12 @@
-import { projectDocName, type Me, type PresenceState, type ProjectEvent } from '@codecollab/shared';
+import {
+  projectDocName,
+  type ChatMessage,
+  type Me,
+  type PresenceState,
+  type ProjectEvent,
+} from '@codecollab/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { presenceHex } from '@/components/ui/avatar';
 import { openDocument } from '@/lib/collab';
 import { projectKeys } from '../projects/api';
@@ -11,27 +17,37 @@ export interface Peer extends PresenceState {
   isMe: boolean;
 }
 
+export interface RoomHandlers {
+  onFileDeleted: (fileId: string) => void;
+  onMessage: (message: ChatMessage) => void;
+}
+
 /**
- * Joins the project's real-time room: publishes who I am and which file I'm on,
- * lists everyone else here, and reacts to server events (file tree changes).
+ * Joins the project's real-time room: publishes who I am, which file I'm on and whether
+ * I'm typing; lists everyone else here; and passes server events (file tree changes,
+ * chat messages) to the handlers.
  */
 export function useProjectRoom(
   projectId: string,
   me: Me | undefined,
   activeFileId: string | null,
-  onFileDeleted: (fileId: string) => void,
+  handlers: RoomHandlers,
 ) {
   const qc = useQueryClient();
   const [peers, setPeers] = useState<Peer[]>([]);
   const [connected, setConnected] = useState(false);
   const provider = useRef<ReturnType<typeof openDocument> | null>(null);
-  const onDeleted = useRef(onFileDeleted);
+  const handlersRef = useRef(handlers);
   useEffect(() => {
-    onDeleted.current = onFileDeleted;
+    handlersRef.current = handlers;
   });
 
+  const meId = me?.id;
+  const meName = me?.username;
+  const meAvatar = me?.avatarUrl ?? null;
+
   useEffect(() => {
-    if (!me) return;
+    if (!meId || !meName) return;
     const p = openDocument(projectDocName(projectId), {
       onStatus: ({ status }) => setConnected(status === 'connected'),
       onStateless: ({ payload }) => {
@@ -41,12 +57,19 @@ export function useProjectRoom(
         } catch {
           return;
         }
-        if (event.type === 'files-changed') {
-          void qc.invalidateQueries({ queryKey: filesKey(projectId) });
-        } else if (event.type === 'file-deleted') {
-          onDeleted.current(event.fileId);
-        } else if (event.type === 'access-changed') {
-          void qc.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
+        switch (event.type) {
+          case 'files-changed':
+            void qc.invalidateQueries({ queryKey: filesKey(projectId) });
+            break;
+          case 'file-deleted':
+            handlersRef.current.onFileDeleted(event.fileId);
+            break;
+          case 'access-changed':
+            void qc.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
+            break;
+          case 'message':
+            handlersRef.current.onMessage(event.message);
+            break;
         }
       },
       onAwarenessChange: ({ states }) => {
@@ -63,23 +86,31 @@ export function useProjectRoom(
       },
     });
     p.setAwarenessField('user', {
-      id: me.id,
-      name: me.username,
-      color: presenceHex(me.id),
-      avatarUrl: me.avatarUrl,
+      id: meId,
+      name: meName,
+      color: presenceHex(meId),
+      avatarUrl: meAvatar,
     } satisfies PresenceState['user']);
     provider.current = p;
     return () => {
       provider.current = null;
       p.destroy();
     };
-  }, [projectId, me, qc]);
+  }, [projectId, meId, meName, meAvatar, qc]);
 
   useEffect(() => {
     provider.current?.setAwarenessField('fileId', activeFileId);
   }, [activeFileId, peers.length]);
 
+  /** Announce that I'm typing in the main chat or a thread (`null` to stop). */
+  const setTyping = useCallback((where: string | null) => {
+    provider.current?.setAwarenessField(
+      'typing',
+      where ? ({ in: where, at: Date.now() } satisfies PresenceState['typing']) : null,
+    );
+  }, []);
+
   // The same person in two tabs shows up twice in awareness; show them once.
   const unique = [...new Map(peers.map((p) => [p.user.id, p])).values()];
-  return { peers: unique, connected };
+  return { peers: unique, connected, setTyping };
 }

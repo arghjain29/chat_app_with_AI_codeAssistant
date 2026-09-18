@@ -30,6 +30,12 @@ export function ProjectCard({ project }: { project: Project }) {
           {project.role === 'owner' ? 'You' : project.owner.username}
         </span>
         <span className="flex items-center gap-3">
+          {project.unreadCount > 0 && (
+            <span className="rounded-full bg-cobalt px-2 py-0.5 font-medium text-cobalt-ink">
+              {project.unreadCount > 99 ? '99+' : project.unreadCount} new{' '}
+              {project.unreadCount === 1 ? 'message' : 'messages'}
+            </span>
+          )}
           <span className="flex items-center gap-1" title={`${project.memberCount} people`}>
             <Users className="size-3.5" aria-hidden />
             {project.memberCount}

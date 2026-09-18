@@ -11,8 +11,8 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 | 0     | Foundation: TypeScript workspace, Clerk auth, API skeleton, CI                   | Done   |
 | 1     | Projects, roles (owner/editor/viewer), invite links, plan limits                 | Done   |
 | 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Done   |
-| 3     | Persistent chat: threads, reactions, mentions, unread                            | Next   |
-| 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection |        |
+| 3     | Persistent chat: threads, reactions, mentions, unread                            | Done   |
+| 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection | Next   |
 | 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                |        |
 | 6     | Polish: landing page, onboarding, Sentry, Playwright e2e, deploy                 |        |
 
