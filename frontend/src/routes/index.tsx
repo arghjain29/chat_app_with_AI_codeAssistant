@@ -33,7 +33,7 @@ function Landing() {
 
       <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-12 px-4 pt-8 pb-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <section>
-          <h1 className="font-display text-5xl leading-[1.02] font-bold tracking-tight [font-stretch:88%] sm:text-6xl">
+          <h1 className="font-display text-5xl leading-[1.02] font-bold tracking-tight font-stretch:88% sm:text-6xl">
             Write code in the same file, at the same time.
           </h1>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-muted">
