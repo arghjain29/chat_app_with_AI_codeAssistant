@@ -35,6 +35,8 @@ export function createApp(): Express {
       origin: env.FRONTEND_URL,
       credentials: true,
       exposedHeaders: ['x-request-id', 'ratelimit-remaining', 'ratelimit-reset'],
+      // Let browsers reuse preflight results instead of sending OPTIONS before every call.
+      maxAge: 600,
     }),
   );
 

@@ -7,10 +7,11 @@ import {
 } from '@tanstack/react-router';
 import { Toaster } from 'sonner';
 import { Button } from '@/components/ui/button';
+import type { RouterAuth } from '@/features/auth/auth';
 import { useTheme } from '@/lib/theme';
 
 export interface RouterContext {
-  auth: { isSignedIn: boolean };
+  auth: RouterAuth;
   queryClient: QueryClient;
 }
 

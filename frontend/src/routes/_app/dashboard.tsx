@@ -5,13 +5,18 @@ import { FolderPlus, Plus, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useMe } from '@/features/auth/use-me';
+import { meQuery, useMe } from '@/features/auth/use-me';
 import { projectsQuery } from '@/features/projects/api';
 import { CreateProjectDialog } from '@/features/projects/create-project-dialog';
 import { ProjectCard } from '@/features/projects/project-card';
 
 export const Route = createFileRoute('/_app/dashboard')({
-  loader: ({ context }) => context.queryClient.prefetchQuery(projectsQuery),
+  // Fetch both in parallel rather than waiting for one before starting the other.
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.prefetchQuery(projectsQuery),
+      context.queryClient.prefetchQuery(meQuery),
+    ]),
   component: Dashboard,
 });
 

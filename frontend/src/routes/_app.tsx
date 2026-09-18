@@ -5,8 +5,9 @@ import { ThemeToggle } from '@/components/theme-toggle';
 
 /** Layout for every signed-in page. Anonymous visitors are sent to sign in. */
 export const Route = createFileRoute('/_app')({
-  beforeLoad: ({ context, location }) => {
-    if (!context.auth.isSignedIn) {
+  beforeLoad: async ({ context, location }) => {
+    await context.auth.ready();
+    if (!context.auth.isSignedIn()) {
       throw redirect({
         to: '/sign-in/$',
         params: { _splat: '' },
@@ -15,6 +16,8 @@ export const Route = createFileRoute('/_app')({
     }
   },
   component: AppLayout,
+  // Shown only if Clerk takes a moment to load on a direct visit to a signed-in page.
+  pendingComponent: () => <div className="min-h-dvh bg-paper" aria-busy="true" />,
 });
 
 function AppLayout() {

@@ -1,8 +1,9 @@
-import { ClerkProvider, useAuth } from '@clerk/react';
+import { ClerkProvider, useAuth, useClerk } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
-import { StrictMode, useEffect } from 'react';
+import { StrictMode, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createRouterAuth } from './features/auth/auth';
 import { ApiError, setTokenGetter } from './lib/api';
 import { env } from './lib/env';
 import { routeTree } from './routeTree.gen';
@@ -18,9 +19,11 @@ const queryClient = new QueryClient({
   },
 });
 
+const { auth, sync: syncAuth } = createRouterAuth();
+
 const router = createRouter({
   routeTree,
-  context: { auth: { isSignedIn: false }, queryClient },
+  context: { auth, queryClient },
   defaultPreload: 'intent',
   scrollRestoration: true,
 });
@@ -31,21 +34,31 @@ declare module '@tanstack/react-router' {
   }
 }
 
-function App() {
+/** Keeps the router and API client in step with Clerk, without blocking the first render. */
+function AuthBridge() {
+  const clerk = useClerk();
   const { isLoaded, isSignedIn, getToken } = useAuth();
 
-  // Set during render, not in an effect: route loaders fire from the router's own
-  // (child) effects, which run before this component's effects would.
+  // Set during render, not in an effect: route guards and loaders run from the router's
+  // own (child) effects, which fire before this component's effects would.
+  syncAuth(clerk, isLoaded);
   setTokenGetter(() => getToken());
 
-  // Re-run route guards whenever the session changes (sign in / sign out).
+  const wasSignedIn = useRef<boolean | undefined>(undefined);
   useEffect(() => {
-    if (isLoaded) void router.invalidate();
+    if (!isLoaded) return;
+    if (wasSignedIn.current && !isSignedIn) {
+      // Signed out (here or in another tab): drop the previous user's cached data
+      // and leave any signed-in page.
+      queryClient.clear();
+      if (router.state.matches.some((m) => m.routeId.startsWith('/_app'))) {
+        void router.navigate({ to: '/', replace: true });
+      }
+    }
+    wasSignedIn.current = isSignedIn;
   }, [isLoaded, isSignedIn]);
 
-  if (!isLoaded) return <div className="min-h-dvh bg-paper" aria-busy="true" />;
-
-  return <RouterProvider router={router} context={{ auth: { isSignedIn: !!isSignedIn } }} />;
+  return null;
 }
 
 createRoot(document.getElementById('root')!).render(
@@ -57,8 +70,9 @@ createRoot(document.getElementById('root')!).render(
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
       afterSignOutUrl="/"
-      routerPush={(to) => router.navigate({ to })}
-      routerReplace={(to) => router.navigate({ to, replace: true })}
+      // Clerk hands over complete URLs (path + query), so navigate by href.
+      routerPush={(to) => router.navigate({ href: to })}
+      routerReplace={(to) => router.navigate({ href: to, replace: true })}
       appearance={{
         variables: {
           colorPrimary: 'var(--cobalt)',
@@ -74,7 +88,8 @@ createRoot(document.getElementById('root')!).render(
       }}
     >
       <QueryClientProvider client={queryClient}>
-        <App />
+        <AuthBridge />
+        <RouterProvider router={router} />
       </QueryClientProvider>
     </ClerkProvider>
   </StrictMode>,
