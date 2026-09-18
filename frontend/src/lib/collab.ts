@@ -9,8 +9,23 @@ let socket: HocuspocusProviderWebsocket | null = null;
 
 /** One WebSocket for the whole app; every open document is multiplexed over it. */
 function sharedSocket() {
-  socket ??= new HocuspocusProviderWebsocket({ url: COLLAB_URL });
-  return socket;
+  if (socket) return socket;
+  const ws = new HocuspocusProviderWebsocket({
+    url: COLLAB_URL,
+    // Retry quickly: the default backoff grows to 30s, which feels like the app is broken
+    // (e.g. after the API restarts). Capped at 5s, with jitter so clients don't stampede.
+    delay: 500,
+    minDelay: 500,
+    maxDelay: 5_000,
+  });
+  // Coming back online or to the tab: reconnect now instead of waiting for the next retry.
+  const reconnectNow = () => {
+    if (document.visibilityState === 'visible' && ws.status !== 'connected') void ws.connect();
+  };
+  window.addEventListener('online', reconnectNow);
+  document.addEventListener('visibilitychange', reconnectNow);
+  socket = ws;
+  return ws;
 }
 
 /** Open a real-time document. Call `destroy()` on the result when done with it. */

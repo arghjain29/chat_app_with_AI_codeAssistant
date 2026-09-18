@@ -125,6 +125,11 @@ function toWebRequest(req: IncomingMessage): Request {
   return new Request(`http://${req.headers.host ?? 'localhost'}${req.url ?? '/'}`, { headers });
 }
 
+/** Hocuspocus protocol keep-alive messages (MessageType.Ping / MessageType.Pong). */
+const PING = new Uint8Array([9]);
+const PONG = 10;
+const KEEPALIVE_MS = 15_000;
+
 /** Exact origins (scheme + host + port) of the frontend, e.g. `https://app.example.com`. */
 const allowedOrigins = new Set(
   env.FRONTEND_URL.flatMap((u) => {
@@ -155,11 +160,22 @@ export function attachCollab(server: Server) {
     wss.handleUpgrade(req, socket, head, (ws) => {
       // Hocuspocus v4 doesn't listen to the socket itself: forward messages and close events.
       const connection = collab.handleConnection(ws, toWebRequest(req));
+
+      // Clients drop a connection after 30s without hearing from the server, so ping idle
+      // ones. (Their pong replies aren't document data: don't hand them to Hocuspocus.)
+      const keepAlive = setInterval(() => {
+        if (ws.readyState === ws.OPEN) ws.send(PING);
+      }, KEEPALIVE_MS);
+
       ws.on('message', (data: Buffer | ArrayBuffer | Buffer[]) => {
         const bytes = Array.isArray(data) ? Buffer.concat(data) : Buffer.from(data as ArrayBuffer);
+        if (bytes.length === 1 && bytes[0] === PONG) return;
         connection.handleMessage(new Uint8Array(bytes));
       });
-      ws.on('close', (code, reason) => connection.handleClose({ code, reason: reason.toString() }));
+      ws.on('close', (code, reason) => {
+        clearInterval(keepAlive);
+        connection.handleClose({ code, reason: reason.toString() });
+      });
       ws.on('error', (err) => logger.warn({ err: err.message }, 'Collaboration socket error'));
     });
   });
