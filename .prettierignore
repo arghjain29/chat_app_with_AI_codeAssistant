@@ -1,0 +1,7 @@
+legacy/
+node_modules/
+dist/
+coverage/
+package-lock.json
+frontend/src/routeTree.gen.ts
+docs/
