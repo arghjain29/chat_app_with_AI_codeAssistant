@@ -229,6 +229,22 @@ export function ChatPanel({
     void main.fetchNextPage();
   };
 
+  // Stay pinned to the newest message while at the bottom: when the panel is first shown
+  // (it may have loaded while hidden, with no height), when it's resized, and while an AI
+  // answer streams in without adding new messages.
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    const inner = content.current;
+    if (!el || !inner) return;
+    const ro = new ResizeObserver(() => {
+      if (stickToBottom.current && el.clientHeight > 0) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [threadId]);
+
   const onScroll = () => {
     const bottom = atBottom();
     stickToBottom.current = bottom;
@@ -306,100 +322,103 @@ export function ChatPanel({
           aria-live="polite"
           aria-label={threadId ? 'Thread messages' : 'Project chat'}
         >
-          {!threadId && main.isFetchingNextPage && (
-            <p className="py-2 text-center text-xs text-ink-muted">Loading earlier messages…</p>
-          )}
-          {!threadId && main.hasNextPage === false && shown.length > 0 && (
-            <p className="px-4 pt-2 pb-4 text-center text-xs text-ink-muted">
-              This is the start of the {project.name} chat.
-            </p>
-          )}
-
-          {threadId && root && (
-            <div className="mb-2 border-b border-line pb-2">
-              <MessageItem
-                message={root}
-                compact={false}
-                inThread
-                meId={me.id}
-                isOwner={isOwner}
-                members={members}
-                onReact={(emoji) => react.mutate({ id: root.id, emoji })}
-                onEdit={(content) => edit.mutate({ id: root.id, content })}
-                onDelete={() => setConfirmDelete(root)}
-                ai={aiProps}
-              />
-              <p className="px-14 pt-1 text-xs text-ink-muted">
-                {root.replyCount} {root.replyCount === 1 ? 'reply' : 'replies'}
+          {/* Wrapped so a ResizeObserver can tell when the messages grow. */}
+          <div ref={content} className="flex min-h-full flex-col">
+            {!threadId && main.isFetchingNextPage && (
+              <p className="py-2 text-center text-xs text-ink-muted">Loading earlier messages…</p>
+            )}
+            {!threadId && main.hasNextPage === false && shown.length > 0 && (
+              <p className="px-4 pt-2 pb-4 text-center text-xs text-ink-muted">
+                This is the start of the {project.name} chat.
               </p>
-            </div>
-          )}
+            )}
 
-          {error ? (
-            <p role="alert" className="px-4 py-6 text-center text-sm text-ink-muted">
-              Couldn’t load messages: {error.message}
-            </p>
-          ) : loading ? (
-            <div className="space-y-4 px-3 py-2" aria-busy="true">
-              {[60, 85, 40].map((w) => (
-                <div key={w} className="flex gap-2.5">
-                  <span className="size-8 animate-pulse rounded-full bg-surface-2" />
-                  <span
-                    className="h-10 animate-pulse rounded-lg bg-surface-2"
-                    style={{ width: `${w}%` }}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : shown.length === 0 ? (
-            <div className="grid h-full place-items-center px-6 text-center">
-              <div>
-                <MessagesSquare className="mx-auto size-8 text-ink-muted" aria-hidden />
-                <p className="mt-3 text-sm text-ink-muted">
-                  {threadId
-                    ? 'No replies yet. Start the thread below.'
-                    : 'No messages yet. Say hi, or mention a teammate with @.'}
+            {threadId && root && (
+              <div className="mb-2 border-b border-line pb-2">
+                <MessageItem
+                  message={root}
+                  compact={false}
+                  inThread
+                  meId={me.id}
+                  isOwner={isOwner}
+                  members={members}
+                  onReact={(emoji) => react.mutate({ id: root.id, emoji })}
+                  onEdit={(content) => edit.mutate({ id: root.id, content })}
+                  onDelete={() => setConfirmDelete(root)}
+                  ai={aiProps}
+                />
+                <p className="px-14 pt-1 text-xs text-ink-muted">
+                  {root.replyCount} {root.replyCount === 1 ? 'reply' : 'replies'}
                 </p>
               </div>
-            </div>
-          ) : (
-            shown.map((m, i) => {
-              const prev = shown[i - 1];
-              const newDay = !prev || dayLabel(prev.createdAt) !== dayLabel(m.createdAt);
-              const compact =
-                !newDay &&
-                !!prev &&
-                prev.author?.id === m.author?.id &&
-                !prev.deletedAt &&
-                new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() <
-                  GROUP_WINDOW_MS;
-              return (
-                <div key={m.clientId ?? m.id}>
-                  {newDay && (
-                    <div className="my-2 flex items-center gap-3 px-3 text-[11px] font-medium text-ink-muted">
-                      <span className="h-px flex-1 bg-line" />
-                      {dayLabel(m.createdAt)}
-                      <span className="h-px flex-1 bg-line" />
-                    </div>
-                  )}
-                  <MessageItem
-                    message={m}
-                    compact={compact}
-                    inThread={!!threadId}
-                    meId={me.id}
-                    isOwner={isOwner}
-                    members={members as Member[]}
-                    pending={pendingFor(m)}
-                    onReact={(emoji) => react.mutate({ id: m.id, emoji })}
-                    onReply={threadId ? undefined : () => openThread(m.id)}
-                    onEdit={(content) => edit.mutate({ id: m.id, content })}
-                    onDelete={() => setConfirmDelete(m)}
-                    ai={aiProps}
-                  />
+            )}
+
+            {error ? (
+              <p role="alert" className="px-4 py-6 text-center text-sm text-ink-muted">
+                Couldn’t load messages: {error.message}
+              </p>
+            ) : loading ? (
+              <div className="space-y-4 px-3 py-2" aria-busy="true">
+                {[60, 85, 40].map((w) => (
+                  <div key={w} className="flex gap-2.5">
+                    <span className="size-8 animate-pulse rounded-full bg-surface-2" />
+                    <span
+                      className="h-10 animate-pulse rounded-lg bg-surface-2"
+                      style={{ width: `${w}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : shown.length === 0 ? (
+              <div className="grid flex-1 place-items-center px-6 text-center">
+                <div>
+                  <MessagesSquare className="mx-auto size-8 text-ink-muted" aria-hidden />
+                  <p className="mt-3 text-sm text-ink-muted">
+                    {threadId
+                      ? 'No replies yet. Start the thread below.'
+                      : 'No messages yet. Say hi, or mention a teammate with @.'}
+                  </p>
                 </div>
-              );
-            })
-          )}
+              </div>
+            ) : (
+              shown.map((m, i) => {
+                const prev = shown[i - 1];
+                const newDay = !prev || dayLabel(prev.createdAt) !== dayLabel(m.createdAt);
+                const compact =
+                  !newDay &&
+                  !!prev &&
+                  prev.author?.id === m.author?.id &&
+                  !prev.deletedAt &&
+                  new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() <
+                    GROUP_WINDOW_MS;
+                return (
+                  <div key={m.clientId ?? m.id}>
+                    {newDay && (
+                      <div className="my-2 flex items-center gap-3 px-3 text-[11px] font-medium text-ink-muted">
+                        <span className="h-px flex-1 bg-line" />
+                        {dayLabel(m.createdAt)}
+                        <span className="h-px flex-1 bg-line" />
+                      </div>
+                    )}
+                    <MessageItem
+                      message={m}
+                      compact={compact}
+                      inThread={!!threadId}
+                      meId={me.id}
+                      isOwner={isOwner}
+                      members={members as Member[]}
+                      pending={pendingFor(m)}
+                      onReact={(emoji) => react.mutate({ id: m.id, emoji })}
+                      onReply={threadId ? undefined : () => openThread(m.id)}
+                      onEdit={(content) => edit.mutate({ id: m.id, content })}
+                      onDelete={() => setConfirmDelete(m)}
+                      ai={aiProps}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
         {showJump && (
