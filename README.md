@@ -13,8 +13,8 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 | 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Done   |
 | 3     | Persistent chat: threads, reactions, mentions, unread                            | Done   |
 | 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection | Done   |
-| 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                | Next   |
-| 6     | Polish: landing page, onboarding, Sentry, Playwright e2e, deploy                 |        |
+| 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                | Done   |
+| 6     | Polish: landing page, onboarding, Sentry, Playwright e2e, deploy                 | Next   |
 
 ## Stack
 
@@ -75,6 +75,18 @@ Mention `@ai` in a project's chat. The answer streams to everyone in the project
 - **Providers:** Gemini (`GEMINI_API_KEY`, the free tier is enough) and optionally Claude (`ANTHROPIC_API_KEY`), called through their official SDKs. Each plan tier has an ordered fallback list (`AI_FAST_MODELS`, `AI_PREMIUM_MODELS`); models without a key are skipped, and the next model is tried if one is unavailable before it starts answering.
 - **Limits:** per-plan quotas (Free: 30 requests/day, Pro: 1,500/month), a per-minute rate limit, one answer at a time per person, and a daily spending ceiling for the whole app (`AI_DAILY_BUDGET_USD`). Viewers can't ask the AI. Requests that produce nothing are refunded.
 - **Safety:** project files and chat are passed as delimited, untrusted data; suggested paths are validated like any file path; nothing changes until a person accepts; and a suggestion is refused if a file changed after the AI read it.
+
+## Payments (Stripe, test mode)
+
+Free and Pro plans (`shared/src/plans.ts`). Upgrading goes through Stripe Checkout; card changes, invoices and cancellation go through the Stripe customer portal. The plan only changes when a **verified Stripe webhook** says so: the success page never grants anything by itself.
+
+1. Create a free Stripe account, stay in **test mode**, and copy the secret key into `backend/.env` as `STRIPE_SECRET_KEY` (`sk_test_…`).
+2. Create the Pro product and prices once: `npm run stripe:setup -w backend` (safe to re-run; refuses live keys).
+3. Forward webhooks while developing with the [Stripe CLI](https://docs.stripe.com/stripe-cli): `stripe listen --forward-to localhost:3000/webhooks/stripe`, and put the `whsec_…` it prints in `STRIPE_WEBHOOK_SECRET`. In production, add an endpoint in the Stripe dashboard for `checkout.session.completed` and `customer.subscription.*`.
+4. In the Stripe dashboard, turn on the customer portal (Settings → Billing → Customer portal).
+5. Pay with the test card `4242 4242 4242 4242`, any future date and any CVC.
+
+Webhook deliveries are verified, processed once (retries are ignored), and always re-read the subscription from Stripe so late or out-of-order events can't leave a stale plan. `past_due` keeps Pro during payment retries; cancellation takes effect at the end of the paid period. Deleting an account cancels its subscription. Billing sits behind a small `BillingProvider` interface (`backend/src/modules/billing/provider.ts`) so another provider, such as Razorpay, can be added.
 
 ## API conventions
 

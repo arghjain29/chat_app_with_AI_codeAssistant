@@ -1,6 +1,6 @@
 import { PLANS, type Project } from '@codecollab/shared';
 import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { Plus, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -74,6 +74,15 @@ function Dashboard() {
           <div className="hidden gap-2 sm:grid">
             {limit !== null && plan && (
               <PlanMeter label={`${plan.name} plan`} used={owned} limit={limit} unit="projects" />
+            )}
+            {me?.plan === 'free' && (
+              <Link
+                to="/pricing"
+                search={{ checkout: undefined }}
+                className="order-last text-right text-xs font-medium text-cobalt hover:underline"
+              >
+                Upgrade to Pro
+              </Link>
             )}
             {usage?.aiAvailable && (
               <PlanMeter

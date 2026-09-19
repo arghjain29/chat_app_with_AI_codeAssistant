@@ -15,6 +15,11 @@ function Landing() {
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5">
         <Logo />
         <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/pricing" search={{ checkout: undefined }}>
+              Pricing
+            </Link>
+          </Button>
           <ThemeToggle />
           <Show when="signed-out">
             <Button asChild variant="ghost" size="sm">

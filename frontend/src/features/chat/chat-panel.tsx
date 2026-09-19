@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { membersQuery } from '../projects/api';
+import { membersQuery, toastError } from '../projects/api';
 import type { Peer } from '../workspace/use-project-room';
 import {
   flattenPages,
@@ -141,7 +141,7 @@ export function ChatPanel({
           onError: (err) => {
             // Limits (AI quota, rate, viewer role…) explain themselves; say why it failed.
             if (err instanceof ApiError && err.status !== 0 && err.status < 500) {
-              toast.error(err.message);
+              toastError(err);
             }
             setPending((list) =>
               list.map((x) => (x.clientId === p.clientId ? { ...x, status: 'failed' } : x)),

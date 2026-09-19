@@ -33,13 +33,20 @@ function AppLayout() {
           <div className="flex h-14 items-center justify-between px-4 lg:px-6">
             <div className="flex items-center gap-6">
               <Logo to="/dashboard" />
-              <nav className="hidden text-sm sm:flex" aria-label="Main">
+              <nav className="hidden gap-1 text-sm sm:flex" aria-label="Main">
                 <Link
                   to="/dashboard"
                   className="rounded-md px-2.5 py-1.5 text-ink-muted hover:bg-surface-2 hover:text-ink"
                   activeProps={{ className: 'bg-surface-2 text-ink! font-medium' }}
                 >
                   Projects
+                </Link>
+                <Link
+                  to="/settings/billing"
+                  className="rounded-md px-2.5 py-1.5 text-ink-muted hover:bg-surface-2 hover:text-ink"
+                  activeProps={{ className: 'bg-surface-2 text-ink! font-medium' }}
+                >
+                  Billing
                 </Link>
               </nav>
             </div>

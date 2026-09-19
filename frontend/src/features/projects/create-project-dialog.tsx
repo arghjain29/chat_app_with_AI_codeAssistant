@@ -1,5 +1,5 @@
 import { CreateProjectInputSchema } from '@codecollab/shared';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,12 @@ const TEMPLATE_OPTIONS = [
 
 export function CreateProjectDialog({ trigger }: { trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; description?: string; form?: string }>({});
+  const [errors, setErrors] = useState<{
+    name?: string;
+    description?: string;
+    form?: string;
+    upgrade?: boolean;
+  }>({});
   const create = useCreateProject();
   const navigate = useNavigate();
 
@@ -49,6 +54,7 @@ export function CreateProjectDialog({ trigger }: { trigger: ReactNode }) {
       onError: (err) =>
         setErrors({
           form: err instanceof ApiError ? err.message : 'Couldn’t create the project. Try again.',
+          upgrade: err instanceof ApiError && err.code === 'PLAN_LIMIT',
         }),
     });
   };
@@ -102,7 +108,16 @@ export function CreateProjectDialog({ trigger }: { trigger: ReactNode }) {
           </Field>
           {errors.form && (
             <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
-              {errors.form}
+              {errors.form}{' '}
+              {errors.upgrade && (
+                <Link
+                  to="/pricing"
+                  search={{ checkout: undefined }}
+                  className="font-medium underline"
+                >
+                  See plans
+                </Link>
+              )}
             </p>
           )}
           <DialogFooter>

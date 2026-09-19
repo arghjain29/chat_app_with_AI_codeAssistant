@@ -50,10 +50,15 @@ export const invitePreviewQuery = (token: string) =>
     retry: false,
   });
 
-/** Show a mutation failure as a toast, in the server's own words. */
+/** Show a mutation failure as a toast, in the server's own words. Plan limits link to pricing. */
 export const toastError = (err: unknown) => {
   const message = err instanceof ApiError ? err.message : 'Something went wrong. Try again.';
-  toast.error(message);
+  const planLimit = err instanceof ApiError && err.code === 'PLAN_LIMIT';
+  toast.error(message, {
+    action: planLimit
+      ? { label: 'See plans', onClick: () => window.location.assign('/pricing') }
+      : undefined,
+  });
 };
 
 const json = (body: unknown) => ({ body: JSON.stringify(body) });
