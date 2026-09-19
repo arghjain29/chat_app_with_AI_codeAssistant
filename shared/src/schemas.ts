@@ -66,6 +66,8 @@ export const ProjectSchema = z.object({
   /** The caller's role in this project. */
   role: RoleSchema,
   memberCount: z.number().int(),
+  /** Up to four members (owner first), for avatar stacks. */
+  members: z.array(UserSummarySchema),
   /** Chat messages from others since the caller last read the chat. */
   unreadCount: z.number().int(),
   createdAt: z.string(),

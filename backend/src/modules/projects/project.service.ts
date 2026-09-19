@@ -5,6 +5,7 @@ import {
   type CreateProjectInput,
   type Project,
   type UpdateProjectInput,
+  type UserSummary,
 } from '@codecollab/shared';
 import type { Types } from 'mongoose';
 import { PlanLimitError } from '../../lib/errors.js';
@@ -15,7 +16,7 @@ import type { ProjectAccess } from './access.js';
 import { InviteModel } from './invite.model.js';
 import { MembershipModel } from './membership.model.js';
 import { ProjectModel, type ProjectDoc } from './project.model.js';
-import { toProject } from './serializers.js';
+import { toProject, toUserSummary } from './serializers.js';
 
 const slugify = (name: string) =>
   name
@@ -35,23 +36,64 @@ async function uniqueSlug(ownerId: Types.ObjectId, name: string, excludeId?: Typ
   return slug;
 }
 
-async function memberCounts(projectIds: Types.ObjectId[]): Promise<Map<string, number>> {
-  const rows = await MembershipModel.aggregate<{ _id: Types.ObjectId; count: number }>([
-    { $match: { projectId: { $in: projectIds } } },
-    { $group: { _id: '$projectId', count: { $sum: 1 } } },
-  ]);
-  return new Map(rows.map((r) => [r._id.toString(), r.count]));
+const PREVIEW_SIZE = 4;
+const ROLE_RANK = { owner: 0, editor: 1, viewer: 2 } as const;
+
+/** Member count and the first few members (owner first) of each project. */
+async function memberSummaries(
+  projectIds: Types.ObjectId[],
+): Promise<Map<string, { count: number; preview: UserSummary[] }>> {
+  const memberships = await MembershipModel.find({ projectId: { $in: projectIds } }).sort({
+    createdAt: 1,
+  });
+  const byProject = new Map<string, typeof memberships>();
+  for (const m of memberships) {
+    const key = m.projectId.toString();
+    byProject.set(key, [...(byProject.get(key) ?? []), m]);
+  }
+  const previewIds = [...byProject.values()].flatMap((list) =>
+    [...list]
+      .sort((a, b) => ROLE_RANK[a.role] - ROLE_RANK[b.role])
+      .slice(0, PREVIEW_SIZE)
+      .map((m) => m.userId),
+  );
+  const users = await UserModel.find({ _id: { $in: previewIds } });
+  const userById = new Map(users.map((u) => [u.id as string, u]));
+
+  return new Map(
+    [...byProject.entries()].map(([key, list]) => [
+      key,
+      {
+        count: list.length,
+        preview: [...list]
+          .sort((a, b) => ROLE_RANK[a.role] - ROLE_RANK[b.role])
+          .slice(0, PREVIEW_SIZE)
+          .flatMap((m) => {
+            const u = userById.get(m.userId.toString());
+            return u ? [toUserSummary(u)] : [];
+          }),
+      },
+    ]),
+  );
 }
 
 /** Serialize one project for a given caller role. */
 export async function presentProject(access: ProjectAccess): Promise<Project> {
   const { project, membership } = access;
-  const [owner, count, unread] = await Promise.all([
+  const [owner, members, unread] = await Promise.all([
     UserModel.findById(project.ownerId),
-    MembershipModel.countDocuments({ projectId: project._id }),
+    memberSummaries([project._id]),
     unreadCounts(membership.userId, [project._id]),
   ]);
-  return toProject(project, owner, membership.role, count, unread.get(project.id) ?? 0);
+  const summary = members.get(project.id);
+  return toProject(
+    project,
+    owner,
+    membership.role,
+    summary?.count ?? 0,
+    unread.get(project.id) ?? 0,
+    summary?.preview,
+  );
 }
 
 export async function listProjectsForUser(userId: Types.ObjectId): Promise<Project[]> {
@@ -63,7 +105,7 @@ export async function listProjectsForUser(userId: Types.ObjectId): Promise<Proje
   });
   const [owners, counts, unread] = await Promise.all([
     UserModel.find({ _id: { $in: projects.map((p) => p.ownerId) } }),
-    memberCounts(projects.map((p) => p._id)),
+    memberSummaries(projects.map((p) => p._id)),
     unreadCounts(
       userId,
       projects.map((p) => p._id),
@@ -76,8 +118,9 @@ export async function listProjectsForUser(userId: Types.ObjectId): Promise<Proje
       p,
       ownerById.get(p.ownerId.toString()) ?? null,
       roleByProject.get(p.id)!,
-      counts.get(p.id) ?? 0,
+      counts.get(p.id)?.count ?? 0,
       unread.get(p.id) ?? 0,
+      counts.get(p.id)?.preview,
     ),
   );
 }
@@ -105,7 +148,7 @@ export async function createProject(user: UserDoc, input: CreateProjectInput): P
     await deleteProjectCascade(project);
     throw err;
   }
-  return toProject(project, user, 'owner', 1);
+  return toProject(project, user, 'owner', 1, 0, [toUserSummary(user)]);
 }
 
 export async function updateProject(

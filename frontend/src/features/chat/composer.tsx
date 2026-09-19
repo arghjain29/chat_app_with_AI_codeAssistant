@@ -28,12 +28,25 @@ export function Composer({
   const typingTimer = useRef<number | undefined>(undefined);
   const lastTypingSent = useRef(0);
 
-  // Grow with the content, up to about eight lines.
+  // Grow with the content, up to about eight lines. Also re-measure when the width changes:
+  // measured while its panel was still being laid out, the placeholder wraps into many lines.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    const fit = () => {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    };
+    fit();
+    let lastWidth = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth !== lastWidth) {
+        lastWidth = el.clientWidth;
+        fit();
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [text]);
 
   useEffect(() => () => window.clearTimeout(typingTimer.current), []);

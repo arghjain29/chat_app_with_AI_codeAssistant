@@ -28,6 +28,7 @@ export const toProject = (
   role: Role,
   memberCount: number,
   unreadCount = 0,
+  members: UserSummary[] = [],
 ): Project => ({
   id: p.id,
   name: p.name,
@@ -36,6 +37,7 @@ export const toProject = (
   owner: owner ? toUserSummary(owner) : deletedUser(p.ownerId),
   role,
   memberCount,
+  members,
   unreadCount,
   createdAt: p.createdAt.toISOString(),
   updatedAt: p.updatedAt.toISOString(),

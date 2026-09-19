@@ -152,7 +152,7 @@ export function Workspace({ project, me }: { project: Project; me: Me }) {
     if (!isDesktop) setMobileView('code');
   };
 
-  const layout = useDefaultLayout({ id: 'workspace-layout', storage: localStorage });
+  const layout = useDefaultLayout({ id: 'workspace-layout-v2', storage: localStorage });
 
   const tree = (
     <FileTree
@@ -329,15 +329,15 @@ export function Workspace({ project, me }: { project: Project; me: Me }) {
       defaultLayout={layout.defaultLayout}
       onLayoutChanged={layout.onLayoutChanged}
     >
-      <Panel id="tree" defaultSize="18" minSize="160px" maxSize="35" className="bg-surface">
+      <Panel id="tree" defaultSize="17%" minSize="160px" maxSize="30%" className="bg-surface">
         {tree}
       </Panel>
       <Separator className="w-px bg-line transition-colors hover:bg-cobalt data-[separator=active]:bg-cobalt" />
-      <Panel id="editor" defaultSize="47" minSize="25">
+      <Panel id="editor" defaultSize="50%" minSize="25%">
         {editor}
       </Panel>
       <Separator className="w-px bg-line transition-colors hover:bg-cobalt data-[separator=active]:bg-cobalt" />
-      <Panel id="side" defaultSize="35" minSize="22">
+      <Panel id="side" defaultSize="33%" minSize="22%">
         {side}
       </Panel>
     </Group>

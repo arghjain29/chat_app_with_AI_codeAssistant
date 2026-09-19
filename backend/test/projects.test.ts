@@ -274,3 +274,23 @@ describe('deleting an account', () => {
     expect(res.body.memberCount).toBe(1);
   });
 });
+
+describe('member previews', () => {
+  it('lists the owner first, then others, up to four', async () => {
+    const alice = await signUp('alice', 'pro');
+    const { id } = await createProject(alice.client);
+    const { token } = await invite(alice.client, id);
+    for (const name of ['bob', 'carol', 'dan', 'erin']) {
+      const u = await signUp(name);
+      await u.client.post(`/api/v1/invites/${token}/accept`).expect(200);
+    }
+    const res = await alice.client.get(`${P}/${id}`).expect(200);
+    expect(res.body.memberCount).toBe(5);
+    expect(res.body.members.map((m: { username: string }) => m.username)).toEqual([
+      'alice',
+      'bob',
+      'carol',
+      'dan',
+    ]);
+  });
+});
