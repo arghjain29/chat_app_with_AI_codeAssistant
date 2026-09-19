@@ -1,5 +1,13 @@
 import { REACTIONS, type ChatMessage, type Member, type Reaction } from '@codecollab/shared';
-import { MessageSquare, MoreHorizontal, Pencil, SmilePlus, Trash2 } from 'lucide-react';
+import {
+  MessageSquare,
+  MoreHorizontal,
+  Pencil,
+  SmilePlus,
+  Sparkles,
+  Square,
+  Trash2,
+} from 'lucide-react';
 import { useState, type KeyboardEvent } from 'react';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,6 +20,7 @@ import {
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { MessageText } from './markdown';
+import { ProposalCard } from './proposal-card';
 
 export interface PendingState {
   status: 'sending' | 'failed';
@@ -34,6 +43,7 @@ export function MessageItem({
   onReply,
   onEdit,
   onDelete,
+  ai,
 }: {
   message: ChatMessage;
   /** Same author as the previous message, shortly after: hide the header. */
@@ -47,12 +57,22 @@ export function MessageItem({
   onReply?: () => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
+  /** Actions on AI answers. */
+  ai?: {
+    canDecide: boolean;
+    deciding: boolean;
+    onStop: (id: string) => void;
+    onDecide: (id: string, decision: 'apply' | 'reject') => void;
+  };
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const mine = message.author?.id === meId;
   const deleted = !!message.deletedAt;
   const mentionsMe = message.mentions.includes(meId);
+  const isAi = message.kind === 'ai';
+  const streaming = message.ai?.status === 'streaming';
+  const canStop = streaming && (message.ai?.requestedBy === meId || isOwner);
   const nameOf = (id: string) => members.find((m) => m.id === id)?.username ?? 'someone';
 
   const saveEdit = () => {
@@ -70,7 +90,7 @@ export function MessageItem({
     }
   };
 
-  const actionsAvailable = !pending && !deleted && !editing;
+  const actionsAvailable = !pending && !deleted && !editing && !streaming;
   const time = (
     <time
       dateTime={message.createdAt}
@@ -95,14 +115,24 @@ export function MessageItem({
     >
       {!mine && (
         <div className="w-8 shrink-0">
-          {!compact && message.author && <Avatar user={message.author} />}
+          {!compact &&
+            (isAi ? (
+              <span className="grid size-8 place-items-center rounded-full bg-cobalt text-cobalt-ink">
+                <Sparkles className="size-4" aria-hidden />
+              </span>
+            ) : (
+              message.author && <Avatar user={message.author} />
+            ))}
         </div>
       )}
 
       <div className={cn('flex max-w-[85%] min-w-0 flex-col', mine ? 'items-end' : 'items-start')}>
         {!compact && !mine && (
           <span className="mb-0.5 px-1 text-xs font-semibold">
-            {message.author?.username ?? 'CodeCollab'}
+            {isAi ? 'AI assistant' : (message.author?.username ?? 'CodeCollab')}
+            {isAi && message.ai?.model && (
+              <span className="ml-1.5 font-normal text-ink-muted">{message.ai.model}</span>
+            )}
           </span>
         )}
 
@@ -114,7 +144,11 @@ export function MessageItem({
                 ? 'border border-dashed border-line'
                 : mine
                   ? 'rounded-tr-md bg-cobalt/12'
-                  : 'rounded-tl-md bg-surface-2',
+                  : message.ai?.status === 'error'
+                    ? 'rounded-tl-md bg-danger/8'
+                    : isAi
+                      ? 'rounded-tl-md border border-cobalt/20 bg-surface'
+                      : 'rounded-tl-md bg-surface-2',
               compact && (mine ? 'rounded-tr-2xl' : 'rounded-tl-2xl'),
               mentionsMe && !deleted && 'ring-2 ring-marigold/70',
             )}
@@ -151,8 +185,24 @@ export function MessageItem({
               </div>
             ) : (
               <div className="[&_.chat-markdown>*:last-child]:inline">
-                <MessageText content={message.content} members={members} meId={meId} />
-                {time}
+                {streaming && !message.content ? (
+                  <span className="flex gap-1 py-1.5" aria-label="The AI is thinking">
+                    {[0, 150, 300].map((d) => (
+                      <span
+                        key={d}
+                        className="size-1.5 animate-bounce rounded-full bg-ink-muted/60"
+                        style={{ animationDelay: `${d}ms` }}
+                      />
+                    ))}
+                  </span>
+                ) : (
+                  <MessageText content={message.content} members={members} meId={meId} />
+                )}
+                {streaming
+                  ? message.content && (
+                      <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 animate-pulse bg-cobalt" />
+                    )
+                  : time}
               </div>
             )}
           </div>
@@ -228,6 +278,33 @@ export function MessageItem({
             </div>
           )}
         </div>
+
+        {canStop && ai && (
+          <button
+            onClick={() => ai.onStop(message.id)}
+            className="mt-1 flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+          >
+            <Square className="size-3" /> Stop
+          </button>
+        )}
+        {message.ai?.status === 'stopped' && (
+          <p className="mt-0.5 px-1 text-[11px] text-ink-muted">Stopped</p>
+        )}
+        {message.ai?.proposal && ai && !deleted && (
+          <ProposalCard
+            proposal={message.ai.proposal}
+            canDecide={ai.canDecide}
+            deciding={ai.deciding}
+            deciderName={
+              message.ai.proposal.decidedBy
+                ? message.ai.proposal.decidedBy === meId
+                  ? 'you'
+                  : nameOf(message.ai.proposal.decidedBy)
+                : null
+            }
+            onDecide={(decision) => ai.onDecide(message.id, decision)}
+          />
+        )}
 
         {pending && (
           <p

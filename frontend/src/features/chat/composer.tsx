@@ -1,11 +1,21 @@
 import { CHAT_LIMITS, type Member } from '@codecollab/shared';
-import { SendHorizontal } from 'lucide-react';
+import { SendHorizontal, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const MENTION_AT_CARET = /(?:^|\s)@([\w-]{0,32})$/;
+
+interface Mentionable {
+  key: string;
+  /** What gets inserted after the @. */
+  name: string;
+  label: string;
+  member?: Member;
+}
+
+const AI_MENTION: Mentionable = { key: 'ai', name: 'ai', label: 'AI assistant' };
 
 export function Composer({
   placeholder,
@@ -14,6 +24,8 @@ export function Composer({
   onSend,
   onTyping,
   autoFocus,
+  aiEnabled = false,
+  aiHint = null,
 }: {
   placeholder: string;
   members: Member[];
@@ -21,6 +33,10 @@ export function Composer({
   onSend: (content: string) => void;
   onTyping: (typing: boolean) => void;
   autoFocus?: boolean;
+  /** Offer `@ai` in the mention list. */
+  aiEnabled?: boolean;
+  /** e.g. "27 AI requests left today". */
+  aiHint?: string | null;
 }) {
   const [text, setText] = useState('');
   const [mention, setMention] = useState<{ query: string; index: number } | null>(null);
@@ -51,12 +67,14 @@ export function Composer({
 
   useEffect(() => () => window.clearTimeout(typingTimer.current), []);
 
-  const candidates = mention
-    ? members
-        .filter(
-          (m) => m.id !== meId && m.username.toLowerCase().startsWith(mention.query.toLowerCase()),
-        )
-        .slice(0, 6)
+  const query = mention?.query.toLowerCase() ?? '';
+  const candidates: Mentionable[] = mention
+    ? [
+        ...(aiEnabled && 'ai'.startsWith(query) ? [AI_MENTION] : []),
+        ...members
+          .filter((m) => m.id !== meId && m.username.toLowerCase().startsWith(query))
+          .map((m) => ({ key: m.id, name: m.username, label: m.username, member: m })),
+      ].slice(0, 6)
     : [];
 
   const signalTyping = () => {
@@ -77,10 +95,10 @@ export function Composer({
     setMention(m ? { query: m[1]!, index: 0 } : null);
   };
 
-  const pickMention = (member: Member) => {
+  const pickMention = (target: Mentionable) => {
     const el = ref.current!;
     const caret = el.selectionStart;
-    const before = text.slice(0, caret).replace(/@([\w-]{0,32})$/, `@${member.username} `);
+    const before = text.slice(0, caret).replace(/@([\w-]{0,32})$/, `@${target.name} `);
     const next = before + text.slice(caret);
     setText(next);
     setMention(null);
@@ -141,7 +159,7 @@ export function Composer({
         >
           {candidates.map((m, i) => (
             <li
-              key={m.id}
+              key={m.key}
               role="option"
               aria-selected={i === mention.index}
               onMouseDown={(e) => {
@@ -153,8 +171,17 @@ export function Composer({
                 i === mention.index && 'bg-surface-2',
               )}
             >
-              <Avatar user={m} size="sm" />
-              {m.username}
+              {m.member ? (
+                <Avatar user={m.member} size="sm" />
+              ) : (
+                <span className="grid size-6 place-items-center rounded-full bg-cobalt text-cobalt-ink">
+                  <Sparkles className="size-3.5" />
+                </span>
+              )}
+              <span>{m.label}</span>
+              {!m.member && (
+                <span className="text-xs text-ink-muted">asks the AI pair-programmer</span>
+              )}
             </li>
           ))}
         </ul>
@@ -189,7 +216,11 @@ export function Composer({
       <div className="mt-1 flex justify-between px-1 text-[11px] text-ink-muted">
         <span className="hidden sm:inline">
           Enter to send, Shift+Enter for a new line, @ to mention
+          {aiEnabled && ', @ai to ask the AI'}
         </span>
+        {aiHint && text.length <= CHAT_LIMITS.maxMessageLength - 400 && (
+          <span className="ml-auto">{aiHint}</span>
+        )}
         {text.length > CHAT_LIMITS.maxMessageLength - 400 && (
           <span className={cn('ml-auto', over > 0 && 'font-medium text-danger')}>
             {over > 0 ? `${over} characters over the limit` : `${-over} characters left`}

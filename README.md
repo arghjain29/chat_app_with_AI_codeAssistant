@@ -12,8 +12,8 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 | 1     | Projects, roles (owner/editor/viewer), invite links, plan limits                 | Done   |
 | 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Done   |
 | 3     | Persistent chat: threads, reactions, mentions, unread                            | Done   |
-| 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection | Next   |
-| 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                |        |
+| 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection | Done   |
+| 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                | Next   |
 | 6     | Polish: landing page, onboarding, Sentry, Playwright e2e, deploy                 |        |
 
 ## Stack
@@ -67,6 +67,14 @@ WebContainer needs a cross-origin isolated page (`COOP: same-origin`, `COEP: cre
 ## Real-time collaboration
 
 Each file is a Yjs document served by Hocuspocus at `ws(s)://<api>/collab`, on the same server as the API. Connections authenticate with the Clerk session token; viewers connect read-only. Edits are saved to MongoDB about 2 seconds after typing stops (at most every 10 seconds while typing continues).
+
+## AI assistant
+
+Mention `@ai` in a project's chat. The answer streams to everyone in the project, and code changes arrive as a suggested diff that an editor accepts or dismisses; accepted changes go through the live documents, so open editors update immediately.
+
+- **Providers:** Gemini (`GEMINI_API_KEY`, the free tier is enough) and optionally Claude (`ANTHROPIC_API_KEY`), called through their official SDKs. Each plan tier has an ordered fallback list (`AI_FAST_MODELS`, `AI_PREMIUM_MODELS`); models without a key are skipped, and the next model is tried if one is unavailable before it starts answering.
+- **Limits:** per-plan quotas (Free: 30 requests/day, Pro: 1,500/month), a per-minute rate limit, one answer at a time per person, and a daily spending ceiling for the whole app (`AI_DAILY_BUDGET_USD`). Viewers can't ask the AI. Requests that produce nothing are refunded.
+- **Safety:** project files and chat are passed as delimited, untrusted data; suggested paths are validated like any file path; nothing changes until a person accepts; and a suggestion is refused if a file changed after the AI read it.
 
 ## API conventions
 

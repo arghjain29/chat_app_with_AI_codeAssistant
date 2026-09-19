@@ -1,10 +1,12 @@
 import type { ChatMessage, Me, Member, Project } from '@codecollab/shared';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { mentionsAi } from '@codecollab/shared';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowLeft, MessagesSquare } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter } from '@/components/ui/dialog';
+import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { membersQuery } from '../projects/api';
 import type { Peer } from '../workspace/use-project-room';
@@ -16,7 +18,10 @@ import {
   useEditMessage,
   useMarkRead,
   useReact,
+  useDecideProposal,
   useSendMessage,
+  useStopAi,
+  usageQuery,
 } from './chat-api';
 import { Composer } from './composer';
 import { MessageItem, type PendingState } from './message-item';
@@ -56,6 +61,7 @@ const pendingAsMessage = (p: Pending, me: Me, projectId: string): ChatMessage =>
   deletedAt: null,
   createdAt: p.createdAt,
   clientId: p.clientId,
+  ai: null,
 });
 
 export function ChatPanel({
@@ -64,6 +70,7 @@ export function ChatPanel({
   visible,
   peers,
   onTyping,
+  activeFileId = null,
 }: {
   project: Project;
   me: Me;
@@ -71,8 +78,15 @@ export function ChatPanel({
   visible: boolean;
   peers: Peer[];
   onTyping: (where: string | null) => void;
+  /** The file open in the editor, given to the AI as context. */
+  activeFileId?: string | null;
 }) {
   const [threadId, setThreadId] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const activeFileIdRef = useRef(activeFileId);
+  useEffect(() => {
+    activeFileIdRef.current = activeFileId;
+  });
   const [pending, setPending] = useState<Pending[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<ChatMessage | null>(null);
   const { data: members = [] } = useQuery(membersQuery(project.id));
@@ -85,6 +99,12 @@ export function ChatPanel({
   const del = useDeleteMessage(project.id);
   const react = useReact(project.id);
   const markRead = useMarkRead(project.id);
+  const stopAi = useStopAi(project.id);
+  const decide = useDecideProposal(project.id);
+  const { data: usage } = useQuery(usageQuery);
+  const canEdit = project.role !== 'viewer';
+  const aiEnabled = canEdit && usage?.aiAvailable !== false;
+  const aiLeft = usage ? usage.aiRequests.limit - usage.aiRequests.used : null;
 
   const isOwner = project.role === 'owner';
   const where = threadId ?? 'main';
@@ -105,18 +125,32 @@ export function ChatPanel({
 
   const submit = useCallback(
     (p: Pending) => {
+      const asksAi = mentionsAi(p.content);
       send.mutate(
-        { content: p.content, parentId: p.parentId, clientId: p.clientId },
         {
-          onSuccess: () => setPending((list) => list.filter((x) => x.clientId !== p.clientId)),
-          onError: () =>
+          content: p.content,
+          parentId: p.parentId,
+          clientId: p.clientId,
+          ...(asksAi ? { context: { activeFileId: activeFileIdRef.current } } : {}),
+        },
+        {
+          onSuccess: () => {
+            setPending((list) => list.filter((x) => x.clientId !== p.clientId));
+            if (asksAi) void qc.invalidateQueries({ queryKey: usageQuery.queryKey });
+          },
+          onError: (err) => {
+            // Limits (AI quota, rate, viewer role…) explain themselves; say why it failed.
+            if (err instanceof ApiError && err.status !== 0 && err.status < 500) {
+              toast.error(err.message);
+            }
             setPending((list) =>
               list.map((x) => (x.clientId === p.clientId ? { ...x, status: 'failed' } : x)),
-            ),
+            );
+          },
         },
       );
     },
-    [send],
+    [send, qc],
   );
 
   const onSend = (content: string) => {
@@ -226,6 +260,20 @@ export function ChatPanel({
           ? `${typers[0]!.user.name} and ${typers[1]!.user.name} are typing…`
           : 'Several people are typing…';
 
+  const aiProps = {
+    canDecide: canEdit,
+    onStop: (id: string) => stopAi.mutate(id),
+    onDecide: (id: string, decision: 'apply' | 'reject') =>
+      decide.mutate(
+        { id, decision },
+        {
+          onSuccess: () =>
+            toast.success(decision === 'apply' ? 'Changes applied' : 'Suggestion dismissed'),
+        },
+      ),
+    deciding: decide.isPending,
+  };
+
   // ---- Render ----
 
   const root = thread.data?.root;
@@ -279,6 +327,7 @@ export function ChatPanel({
                 onReact={(emoji) => react.mutate({ id: root.id, emoji })}
                 onEdit={(content) => edit.mutate({ id: root.id, content })}
                 onDelete={() => setConfirmDelete(root)}
+                ai={aiProps}
               />
               <p className="px-14 pt-1 text-xs text-ink-muted">
                 {root.replyCount} {root.replyCount === 1 ? 'reply' : 'replies'}
@@ -345,6 +394,7 @@ export function ChatPanel({
                     onReply={threadId ? undefined : () => openThread(m.id)}
                     onEdit={(content) => edit.mutate({ id: m.id, content })}
                     onDelete={() => setConfirmDelete(m)}
+                    ai={aiProps}
                   />
                 </div>
               );
@@ -381,6 +431,12 @@ export function ChatPanel({
         meId={me.id}
         onSend={onSend}
         onTyping={(typing) => onTyping(typing ? where : null)}
+        aiEnabled={aiEnabled}
+        aiHint={
+          aiLeft === null || !aiEnabled
+            ? null
+            : `${aiLeft} AI ${aiLeft === 1 ? 'request' : 'requests'} left ${usage?.aiRequests.period === 'day' ? 'today' : 'this month'}`
+        }
       />
 
       <Dialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>

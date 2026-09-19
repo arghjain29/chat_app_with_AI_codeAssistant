@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { setUnread, upsertMessage } from '../chat/chat-api';
+import { appendAiDelta, setUnread, upsertMessage, usageQuery } from '../chat/chat-api';
 import { ChatPanel } from '../chat/chat-panel';
 import { CodeEditor } from './code-editor';
 import { FileTree } from './file-tree';
@@ -116,8 +116,13 @@ export function Workspace({ project, me }: { project: Project; me: Me }) {
   });
   const { peers, connected, setTyping } = useProjectRoom(project.id, me, active, {
     onFileDeleted: closeTab,
+    onAiDelta: (event) => appendAiDelta(qc, project.id, event),
     onMessage: (message) => {
       upsertMessage(qc, message);
+      // My AI answer finished: the usage counter changed.
+      if (message.ai?.requestedBy === me.id && message.ai.status !== 'streaming') {
+        void qc.invalidateQueries({ queryKey: usageQuery.queryKey });
+      }
       const firstSight = !seen.current.has(message.id);
       seen.current.add(message.id);
       const fresh = !message.editedAt && !message.deletedAt && message.replyCount === 0;
@@ -248,7 +253,14 @@ export function Workspace({ project, me }: { project: Project; me: Me }) {
 
   const runPanel = <RunPanel ref={run} projectId={project.id} />;
   const chatPanel = (
-    <ChatPanel project={project} me={me} visible={chatVisible} peers={peers} onTyping={setTyping} />
+    <ChatPanel
+      project={project}
+      me={me}
+      visible={chatVisible}
+      peers={peers}
+      onTyping={setTyping}
+      activeFileId={active}
+    />
   );
   const unread = project.unreadCount > 0 && (
     <span className="ml-1.5 rounded-full bg-cobalt px-1.5 text-[10px] leading-4 font-semibold text-cobalt-ink tabular-nums">

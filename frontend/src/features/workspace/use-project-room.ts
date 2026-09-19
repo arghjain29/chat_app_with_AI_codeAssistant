@@ -20,6 +20,7 @@ export interface Peer extends PresenceState {
 export interface RoomHandlers {
   onFileDeleted: (fileId: string) => void;
   onMessage: (message: ChatMessage) => void;
+  onAiDelta: (event: { messageId: string; parentId: string | null; delta: string }) => void;
 }
 
 /**
@@ -69,6 +70,9 @@ export function useProjectRoom(
             break;
           case 'message':
             handlersRef.current.onMessage(event.message);
+            break;
+          case 'ai-delta':
+            handlersRef.current.onAiDelta(event);
             break;
         }
       },

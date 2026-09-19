@@ -1,4 +1,4 @@
-import type { ChatMessage, MessagePage, Project, Reaction } from '@codecollab/shared';
+import type { ChatMessage, MessagePage, Project, Reaction, Usage } from '@codecollab/shared';
 import {
   infiniteQueryOptions,
   queryOptions,
@@ -91,8 +91,12 @@ const json = (body: unknown) => ({ body: JSON.stringify(body) });
 export function useSendMessage(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { content: string; parentId: string | null; clientId: string }) =>
-      api<ChatMessage>(`/projects/${projectId}/messages`, { method: 'POST', ...json(input) }),
+    mutationFn: (input: {
+      content: string;
+      parentId: string | null;
+      clientId: string;
+      context?: { activeFileId: string | null };
+    }) => api<ChatMessage>(`/projects/${projectId}/messages`, { method: 'POST', ...json(input) }),
     onSuccess: (message) => upsertMessage(qc, message),
   });
 }
@@ -138,5 +142,52 @@ export function useMarkRead(projectId: string) {
   return useMutation({
     mutationFn: () => api<void>(`/projects/${projectId}/messages/read`, { method: 'POST' }),
     onMutate: () => setUnread(qc, projectId, () => 0),
+  });
+}
+
+// ---------- AI ----------
+
+export const usageQuery = queryOptions({
+  queryKey: ['me', 'usage'],
+  queryFn: () => api<Usage>('/users/me/usage'),
+  staleTime: 60_000,
+});
+
+/** Append streamed text to an AI answer that's still being written. */
+export function appendAiDelta(
+  qc: QueryClient,
+  projectId: string,
+  event: { messageId: string; parentId: string | null; delta: string },
+) {
+  const add = (m: ChatMessage) =>
+    m.id === event.messageId ? { ...m, content: m.content + event.delta } : m;
+  if (event.parentId === null) {
+    qc.setQueryData<InfiniteData<MessagePage>>(chatKeys.main(projectId), (data) =>
+      data ? { ...data, pages: data.pages.map((p) => ({ ...p, items: p.items.map(add) })) } : data,
+    );
+  } else {
+    qc.setQueryData<Thread>(chatKeys.thread(projectId, event.parentId), (t) =>
+      t ? { ...t, replies: t.replies.map(add) } : t,
+    );
+  }
+}
+
+export function useStopAi(projectId: string) {
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<void>(`/projects/${projectId}/messages/${id}/ai/stop`, { method: 'POST' }),
+    onError: toastError,
+  });
+}
+
+export function useDecideProposal(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: 'apply' | 'reject' }) =>
+      api<ChatMessage>(`/projects/${projectId}/messages/${id}/proposal/${decision}`, {
+        method: 'POST',
+      }),
+    onSuccess: (message) => upsertMessage(qc, message),
+    onError: toastError,
   });
 }

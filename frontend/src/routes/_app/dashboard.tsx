@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { meQuery, useMe } from '@/features/auth/use-me';
+import { usageQuery } from '@/features/chat/chat-api';
 import { projectsQuery } from '@/features/projects/api';
 import { CreateProjectDialog } from '@/features/projects/create-project-dialog';
 import { ProjectCard, ProjectCardSkeleton } from '@/features/projects/project-card';
@@ -37,6 +38,7 @@ const greeting = () => {
 function Dashboard() {
   const { data: me } = useMe();
   const { data: projects, isPending, error, refetch } = useQuery(projectsQuery);
+  const { data: usage } = useQuery(usageQuery);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
 
@@ -69,7 +71,19 @@ function Dashboard() {
           <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">Projects</h1>
         </div>
         <div className="flex items-center gap-5">
-          {limit !== null && plan && <PlanMeter used={owned} limit={limit} planName={plan.name} />}
+          <div className="hidden gap-2 sm:grid">
+            {limit !== null && plan && (
+              <PlanMeter label={`${plan.name} plan`} used={owned} limit={limit} unit="projects" />
+            )}
+            {usage?.aiAvailable && (
+              <PlanMeter
+                label="AI requests"
+                used={usage.aiRequests.used}
+                limit={usage.aiRequests.limit}
+                unit={usage.aiRequests.period === 'day' ? 'today' : 'this month'}
+              />
+            )}
+          </div>
           {atLimit ? newButton : <CreateProjectDialog trigger={newButton} />}
         </div>
       </header>
@@ -162,21 +176,31 @@ function Dashboard() {
 }
 
 /** How much of the plan's project allowance is used. */
-function PlanMeter({ used, limit, planName }: { used: number; limit: number; planName: string }) {
+function PlanMeter({
+  label,
+  used,
+  limit,
+  unit,
+}: {
+  label: string;
+  used: number;
+  limit: number;
+  unit: string;
+}) {
   const pct = Math.min(100, Math.round((used / limit) * 100));
   const full = used >= limit;
   return (
-    <div className="hidden w-44 sm:block">
-      <div className="flex justify-between text-xs">
-        <span className="text-ink-muted">{planName} plan</span>
+    <div className="w-52">
+      <div className="flex justify-between gap-2 text-xs">
+        <span className="text-ink-muted">{label}</span>
         <span className={cn('tabular-nums', full ? 'font-medium text-danger' : 'text-ink')}>
-          {used} of {limit} projects
+          {used} of {limit} {unit}
         </span>
       </div>
       <div
         className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2"
         role="meter"
-        aria-label="Projects used"
+        aria-label={`${label} used`}
         aria-valuenow={used}
         aria-valuemin={0}
         aria-valuemax={limit}
