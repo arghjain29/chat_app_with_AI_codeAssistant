@@ -97,6 +97,37 @@ export function liveFileText(fileId: string): string | null {
   return collab.documents.get(fileDocName(fileId))?.getText(FILE_TEXT_KEY).toString() ?? null;
 }
 
+/**
+ * Replace a file's text through its live document, so everyone with it open sees the change
+ * and it's saved like any other edit. Only the part that differs is replaced, which keeps
+ * teammates' cursors in the untouched parts where they were.
+ */
+export async function replaceFileText(fileId: string, next: string, context: CollabContext) {
+  const connection = await collab.openDirectConnection(fileDocName(fileId), context);
+  try {
+    await connection.transact((doc) => {
+      const text = doc.getText(FILE_TEXT_KEY);
+      const current = text.toString();
+      if (current === next) return;
+      let start = 0;
+      while (start < current.length && start < next.length && current[start] === next[start])
+        start++;
+      let end = 0;
+      while (
+        end < current.length - start &&
+        end < next.length - start &&
+        current[current.length - 1 - end] === next[next.length - 1 - end]
+      ) {
+        end++;
+      }
+      text.delete(start, current.length - start - end);
+      text.insert(start, next.slice(start, next.length - end));
+    });
+  } finally {
+    await connection.disconnect();
+  }
+}
+
 /** Disconnect everyone from a file's document, e.g. after it is deleted. */
 export function closeFileDocument(fileId: string) {
   collab.closeConnections(fileDocName(fileId));

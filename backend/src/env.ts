@@ -41,6 +41,21 @@ const EnvSchema = z.object({
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_WEBHOOK_SIGNING_SECRET: optionalString,
+
+  // AI. One provider key is enough; models without a key are skipped.
+  GEMINI_API_KEY: optionalString,
+  /** v1 name for the Gemini key, still accepted. */
+  GOOGLE_AI_KEY: optionalString,
+  ANTHROPIC_API_KEY: optionalString,
+  /** Ordered fallbacks as provider:model, e.g. "gemini:gemini-3.5-flash-lite,gemini:gemini-3.8-flash". */
+  AI_FAST_MODELS: z
+    .string()
+    .default('gemini:gemini-3.5-flash-lite,gemini:gemini-3.8-flash,anthropic:claude-haiku-4-5'),
+  AI_PREMIUM_MODELS: z
+    .string()
+    .default('anthropic:claude-sonnet-5,gemini:gemini-3.1-pro-preview,gemini:gemini-3.8-flash'),
+  /** Safety net: stop all AI answers for the day once estimated spend reaches this. */
+  AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(2),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -49,5 +64,8 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  GEMINI_API_KEY: parsed.data.GEMINI_API_KEY ?? parsed.data.GOOGLE_AI_KEY,
+};
 export const isProd = env.NODE_ENV === 'production';

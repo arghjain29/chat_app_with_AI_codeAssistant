@@ -50,14 +50,32 @@ async function present(docs: MessageDoc[]): Promise<ChatMessage[]> {
       deletedAt: d.deletedAt?.toISOString() ?? null,
       createdAt: d.createdAt.toISOString(),
       clientId: d.clientId ?? null,
+      ai: d.ai
+        ? {
+            status: d.ai.status,
+            model: d.ai.model ?? null,
+            requestedBy: d.ai.requestedBy ? String(d.ai.requestedBy) : null,
+            proposal: d.ai.proposal
+              ? {
+                  ...d.ai.proposal,
+                  decidedBy: d.ai.proposal.decidedBy ? String(d.ai.proposal.decidedBy) : null,
+                  decidedAt: d.ai.proposal.decidedAt
+                    ? new Date(d.ai.proposal.decidedAt).toISOString()
+                    : null,
+                }
+              : null,
+          }
+        : null,
     };
   });
 }
 
 const presentOne = async (doc: MessageDoc) => (await present([doc]))[0]!;
 
+export const presentMessage = presentOne;
+
 /** Publish a new or changed message to everyone in the project room. */
-async function broadcast(doc: MessageDoc) {
+export async function broadcast(doc: MessageDoc) {
   const message = await presentOne(doc);
   notifyProject(String(doc.projectId), { type: 'message', message });
   return message;

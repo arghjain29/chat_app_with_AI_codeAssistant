@@ -1,4 +1,3 @@
-import { CHAT_LIMITS } from '@codecollab/shared';
 import { Schema, model, type HydratedDocument, type InferSchemaType } from 'mongoose';
 
 const reactionSchema = new Schema(
@@ -14,7 +13,8 @@ const messageSchema = new Schema(
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
     kind: { type: String, enum: ['user', 'ai', 'system'], default: 'user' },
     authorId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    content: { type: String, default: '', maxlength: CHAT_LIMITS.maxMessageLength },
+    // People are limited to CHAT_LIMITS.maxMessageLength by validation; AI answers can be longer.
+    content: { type: String, default: '', maxlength: 60_000 },
     /** Thread root this message replies to; null for main-channel messages. */
     parentId: { type: Schema.Types.ObjectId, ref: 'Message', default: null },
     replyCount: { type: Number, default: 0 },
@@ -26,6 +26,8 @@ const messageSchema = new Schema(
     deletedAt: { type: Date, default: null },
     /** Sender-generated id for idempotent sends. */
     clientId: { type: String, default: null },
+    /** AI answers only: { status, model, requestedBy, proposal } (see AiMeta in shared). */
+    ai: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true },
 );

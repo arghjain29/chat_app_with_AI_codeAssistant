@@ -82,7 +82,9 @@ export type ProjectEvent =
   | { type: 'file-deleted'; fileId: string }
   | { type: 'access-changed' }
   /** A chat message was created or changed; clients upsert it by id. */
-  | { type: 'message'; message: ChatMessage };
+  | { type: 'message'; message: ChatMessage }
+  /** More text streamed into an AI answer. */
+  | { type: 'ai-delta'; messageId: string; parentId: string | null; delta: string };
 
 /** What each collaborator publishes through Yjs awareness. */
 export interface PresenceState {

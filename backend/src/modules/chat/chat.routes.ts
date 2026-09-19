@@ -1,4 +1,5 @@
 import {
+  mentionsAi,
   EditMessageInputSchema,
   MessagePageQuerySchema,
   ObjectIdSchema,
@@ -10,7 +11,12 @@ import rateLimit from 'express-rate-limit';
 import { NotFoundError } from '../../lib/errors.js';
 import { currentUser } from '../../middleware/auth.js';
 import { parseBody, parseQuery } from '../../middleware/validate.js';
+import { startAssistant, stopAssistant } from '../../ai/assistant.js';
+import { authorizeAiRequest, releaseAiSlot } from '../../ai/guard.js';
+import { applyProposal, rejectProposal } from '../../ai/proposal.js';
+import { refundAiRequest } from '../../ai/usage.js';
 import { requireProjectAccess } from '../projects/access.js';
+import { MessageModel } from './message.model.js';
 import {
   deleteMessage,
   editMessage,
@@ -68,7 +74,47 @@ chatRouter.post('/', sendLimiter, async (req, res) => {
   const user = currentUser(req);
   const access = await requireProjectAccess(projectId, user._id);
   const input = parseBody(SendMessageInputSchema, req);
-  res.status(201).json(await sendMessage(access, user._id, input));
+
+  // `@ai`: check every limit before posting, so a refused question isn't left in the chat.
+  const asksAi = mentionsAi(input.content);
+  if (asksAi) await authorizeAiRequest(user, String(access.project._id), access.membership.role);
+
+  let message;
+  try {
+    message = await sendMessage(access, user._id, input);
+  } catch (err) {
+    if (asksAi) {
+      releaseAiSlot(user.id as string, String(access.project._id));
+      await refundAiRequest(user._id, user.plan);
+    }
+    throw err;
+  }
+  if (asksAi) {
+    const trigger = await MessageModel.findById(message.id);
+    if (trigger) {
+      startAssistant({ access, user, trigger, activeFileId: input.context?.activeFileId });
+    }
+  }
+  res.status(201).json(message);
+});
+
+chatRouter.post('/:messageId/ai/stop', async (req, res) => {
+  const { projectId, messageId } = req.params as Params;
+  const access = await requireProjectAccess(projectId, currentUser(req)._id);
+  await stopAssistant(access, messageIdParam(messageId));
+  res.status(204).end();
+});
+
+chatRouter.post('/:messageId/proposal/apply', async (req, res) => {
+  const { projectId, messageId } = req.params as Params;
+  const access = await requireProjectAccess(projectId, currentUser(req)._id);
+  res.json(await applyProposal(access, messageIdParam(messageId)));
+});
+
+chatRouter.post('/:messageId/proposal/reject', async (req, res) => {
+  const { projectId, messageId } = req.params as Params;
+  const access = await requireProjectAccess(projectId, currentUser(req)._id);
+  res.json(await rejectProposal(access, messageIdParam(messageId)));
 });
 
 chatRouter.post('/read', async (req, res) => {

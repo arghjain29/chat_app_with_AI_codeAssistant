@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AiMetaSchema } from './ai.js';
 import { UserSummarySchema } from './schemas.js';
 
 export const CHAT_LIMITS = {
@@ -31,6 +32,8 @@ export const ChatMessageSchema = z.object({
   createdAt: z.string(),
   /** Echo of the sender's temporary id, so their optimistic copy can be replaced. */
   clientId: z.string().nullable(),
+  /** Set on AI answers. */
+  ai: AiMetaSchema.nullable(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
@@ -53,6 +56,16 @@ export const SendMessageInputSchema = z.object({
     .default(null),
   /** Client-generated id; sending the same one twice creates only one message. */
   clientId: z.string().min(8).max(64),
+  /** What the sender is looking at, so an `@ai` question can use it as context. */
+  context: z
+    .object({
+      activeFileId: z
+        .string()
+        .regex(/^[a-f\d]{24}$/i)
+        .nullable()
+        .optional(),
+    })
+    .optional(),
 });
 export type SendMessageInput = z.input<typeof SendMessageInputSchema>;
 

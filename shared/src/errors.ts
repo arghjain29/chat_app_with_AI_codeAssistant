@@ -7,6 +7,7 @@ export const ERROR_CODES = [
   'GONE',
   'RATE_LIMITED',
   'PLAN_LIMIT',
+  'AI_UNAVAILABLE',
   'INTERNAL_ERROR',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
