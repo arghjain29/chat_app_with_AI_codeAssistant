@@ -20,7 +20,7 @@ function sharedSocket() {
   });
   // Coming back online or to the tab: reconnect now instead of waiting for the next retry.
   const reconnectNow = () => {
-    if (document.visibilityState === 'visible' && ws.status !== 'connected') void ws.connect();
+    if (document.visibilityState === 'visible' && ws.status === 'disconnected') void ws.connect();
   };
   window.addEventListener('online', reconnectNow);
   document.addEventListener('visibilitychange', reconnectNow);
@@ -37,6 +37,10 @@ export function openDocument(
     ...options,
     name,
     websocketProvider: sharedSocket(),
+    // Each open copy of a document gets its own session on the shared socket. Without this,
+    // closing and immediately reopening a document (React does exactly that in development)
+    // lets the old copy's "close" cancel the new one: it looks connected but never syncs.
+    sessionAwareness: true,
     // A fresh short-lived Clerk token every time the connection (re)authenticates.
     token: async () => (await getAuthToken()) ?? '',
   });

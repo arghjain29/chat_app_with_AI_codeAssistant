@@ -1,11 +1,11 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { FILE_TEXT_KEY, fileDocName } from '@codecollab/shared';
-import { HocuspocusProvider } from '@hocuspocus/provider';
+import { FILE_TEXT_KEY, fileDocName, projectDocName } from '@codecollab/shared';
+import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FileModel } from '../src/modules/files/file.model.js';
 import { textFromState } from '../src/modules/files/yjs.js';
-import { attachCollab, collab, COLLAB_PATH } from '../src/realtime/collab.js';
+import { attachCollab, collab, COLLAB_PATH, notifyProject } from '../src/realtime/collab.js';
 import { app, createProject, invite, signUp } from './helpers.js';
 
 const P = '/api/v1/projects';
@@ -187,6 +187,46 @@ describe('live collaboration', () => {
 
     v.provider.destroy();
     b.provider.destroy();
+  });
+
+  it('keeps syncing when a document is closed and reopened on a shared socket', async () => {
+    // The browser multiplexes every document over one socket, and React (in development)
+    // opens, closes and reopens each one on mount. This is the client setup the app uses.
+    const { id } = await team();
+    const doc = fileDocName(await fileId(id, 'script.js'));
+    const open = (socket: HocuspocusProviderWebsocket, name: string, token: string, extra = {}) => {
+      const p = new HocuspocusProvider({
+        websocketProvider: socket,
+        name,
+        token,
+        sessionAwareness: true,
+        ...extra,
+      });
+      p.attach();
+      return p;
+    };
+    const aSocket = new HocuspocusProviderWebsocket({ url });
+    const bSocket = new HocuspocusProviderWebsocket({ url });
+    let event = '';
+
+    open(aSocket, doc, 'alice').destroy();
+    open(bSocket, doc, 'bob').destroy();
+    open(bSocket, projectDocName(id), 'bob').destroy();
+    const a = open(aSocket, doc, 'alice');
+    const b = open(bSocket, doc, 'bob');
+    const room = open(bSocket, projectDocName(id), 'bob', {
+      onStateless: ({ payload }: { payload: string }) => (event = payload),
+    });
+
+    await waitFor(() => a.isSynced && b.isSynced && room.isSynced);
+    a.document.getText(FILE_TEXT_KEY).insert(0, 'LIVE ');
+    await waitFor(() => b.document.getText(FILE_TEXT_KEY).toString().startsWith('LIVE '));
+    notifyProject(id, { type: 'files-changed' });
+    await waitFor(() => event.includes('files-changed'));
+
+    for (const p of [a, b, room]) p.destroy();
+    aSocket.destroy();
+    bSocket.destroy();
   });
 
   it('refuses outsiders, bad tokens and unknown documents', async () => {
