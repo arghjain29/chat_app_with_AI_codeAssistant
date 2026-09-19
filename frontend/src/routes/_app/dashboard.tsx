@@ -87,11 +87,7 @@ function Dashboard() {
       ) : (
         <>
           <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-b border-line">
-            <div
-              className="-mx-1 flex gap-1 overflow-x-auto px-1"
-              role="tablist"
-              aria-label="Filter projects"
-            >
+            <div className="flex gap-1" role="tablist" aria-label="Filter projects">
               {FILTERS.map((f) => {
                 const count = projects?.filter(f.match).length;
                 return (
