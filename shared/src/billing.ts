@@ -4,8 +4,11 @@ import { PlanIdSchema } from './schemas.js';
 export const BILLING_INTERVALS = ['month', 'year'] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 
-/** Stripe price lookup keys, created by `npm run stripe:setup -w backend`. */
-export const PRICE_LOOKUP_KEYS: Record<BillingInterval, string> = {
+/**
+ * Tags on the Razorpay plans (in their notes), so the server finds them without storing
+ * plan IDs in configuration. Created by `npm run razorpay:setup -w backend`.
+ */
+export const PLAN_REFS: Record<BillingInterval, string> = {
   month: 'codecollab_pro_monthly',
   year: 'codecollab_pro_yearly',
 };
@@ -27,7 +30,10 @@ export const SubscriptionStatusSchema = z.enum([
 ]);
 export type SubscriptionStatus = z.infer<typeof SubscriptionStatusSchema>;
 
-/** Statuses that keep Pro features on. `past_due` is a grace period while payment is retried. */
+/**
+ * Statuses that keep Pro features on. `past_due` is a grace period while a failed charge is
+ * retried. Razorpay's statuses map onto these (see the Razorpay provider).
+ */
 export const PRO_STATUSES: readonly SubscriptionStatus[] = ['active', 'trialing', 'past_due'];
 
 export const BillingSummarySchema = z.object({
@@ -44,8 +50,8 @@ export const BillingSummarySchema = z.object({
       cancelAtPeriodEnd: z.boolean(),
     })
     .nullable(),
-  /** Whether the customer portal (invoices, card, cancel) is available. */
-  canManage: z.boolean(),
+  /** True when an active subscription can be cancelled (it isn't already ending). */
+  canCancel: z.boolean(),
 });
 export type BillingSummary = z.infer<typeof BillingSummarySchema>;
 

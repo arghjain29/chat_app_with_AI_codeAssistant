@@ -31,3 +31,11 @@ export const ROLE_OPTIONS = (['editor', 'viewer'] as const).map((role) => ({
   label: ROLE_LABEL[role],
   description: ROLE_HINT[role],
 }));
+
+const inr = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 0,
+});
+/** Whole rupees, Indian digit grouping: 7990 -> "₹7,990". */
+export const formatInr = (rupees: number) => inr.format(rupees);

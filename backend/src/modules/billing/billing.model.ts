@@ -4,13 +4,15 @@ import { Schema, model, type HydratedDocument, type InferSchemaType } from 'mong
 const subscriptionSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-    provider: { type: String, enum: ['stripe'], required: true },
-    customerId: { type: String, required: true },
+    provider: { type: String, enum: ['razorpay'], required: true },
     subscriptionId: { type: String, required: true, unique: true },
     status: { type: String, required: true },
     interval: { type: String, enum: ['month', 'year', null], default: null },
     currentPeriodEnd: { type: Date, default: null },
+    /** Set when the person cancels: Pro stays until currentPeriodEnd, then stops. */
     cancelAtPeriodEnd: { type: Boolean, default: false },
+    /** The hosted payment page, reused if checkout is reopened before paying. */
+    checkoutUrl: { type: String, default: null },
   },
   { timestamps: true },
 );

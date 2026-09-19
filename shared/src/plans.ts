@@ -21,7 +21,7 @@ export interface Plan {
   id: PlanId;
   name: string;
   tagline: string;
-  /** Display prices in USD. Real prices live in the billing provider. */
+  /** Prices in whole rupees (INR). Razorpay plans are created from these. */
   price: { monthly: number; yearly: number };
   limits: PlanLimits;
   features: readonly string[];
@@ -53,7 +53,7 @@ export const PLANS: Record<PlanId, Plan> = {
     id: 'pro',
     name: 'Pro',
     tagline: 'For builders who ship with their team',
-    price: { monthly: 10, yearly: 96 },
+    price: { monthly: 799, yearly: 7990 },
     limits: {
       maxOwnedProjects: null,
       maxMembersPerProject: 11,
@@ -73,6 +73,8 @@ export const PLANS: Record<PlanId, Plan> = {
 };
 
 export const getPlan = (id: PlanId): Plan => PLANS[id];
+
+export const PRICE_CURRENCY = 'INR';
 
 /** Whether a user on `plan` who owns `ownedCount` projects may create another. */
 export const canCreateProject = (plan: PlanId, ownedCount: number): boolean => {

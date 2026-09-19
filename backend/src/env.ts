@@ -57,10 +57,11 @@ const EnvSchema = z.object({
   /** Safety net: stop all AI answers for the day once estimated spend reaches this. */
   AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(2),
 
-  // Payments (Stripe). Without a key, billing is switched off and everyone stays on Free.
-  STRIPE_SECRET_KEY: optionalString,
-  /** From the Stripe dashboard webhook endpoint, or `stripe listen` when developing. */
-  STRIPE_WEBHOOK_SECRET: optionalString,
+  // Payments (Razorpay). Without keys, billing is switched off and everyone stays on Free.
+  RAZORPAY_KEY_ID: optionalString,
+  RAZORPAY_KEY_SECRET: optionalString,
+  /** The secret you choose when adding the webhook in the Razorpay dashboard. */
+  RAZORPAY_WEBHOOK_SECRET: optionalString,
 });
 
 const parsed = EnvSchema.safeParse(process.env);

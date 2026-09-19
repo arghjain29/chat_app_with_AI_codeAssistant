@@ -1,9 +1,15 @@
 import { CheckoutInputSchema } from '@codecollab/shared';
+import { randomUUID } from 'node:crypto';
 import express, { Router } from 'express';
 import { logger } from '../../lib/logger.js';
 import { currentUser, requireUser } from '../../middleware/auth.js';
 import { parseBody } from '../../middleware/validate.js';
-import { getBillingSummary, handleWebhook, openPortal, startCheckout } from './billing.service.js';
+import {
+  cancelSubscription,
+  getBillingSummary,
+  handleWebhook,
+  startCheckout,
+} from './billing.service.js';
 import { InvalidSignatureError } from './provider.js';
 
 /** Mounted at /api/v1/billing. */
@@ -19,27 +25,32 @@ billingRouter.post('/checkout', async (req, res) => {
   res.json(await startCheckout(currentUser(req), interval));
 });
 
-billingRouter.post('/portal', async (req, res) => {
-  res.json(await openPortal(currentUser(req)));
+billingRouter.post('/cancel', async (req, res) => {
+  res.json(await cancelSubscription(currentUser(req)));
 });
 
-/** Mounted at /webhooks/stripe, before JSON parsing: the signature covers the raw bytes. */
-export const stripeWebhookRouter = Router();
+/** Mounted at /webhooks/razorpay, before JSON parsing: the signature covers the raw bytes. */
+export const razorpayWebhookRouter = Router();
 
-stripeWebhookRouter.post(
+razorpayWebhookRouter.post(
   '/',
   express.raw({ type: 'application/json', limit: '1mb' }),
   async (req, res) => {
     try {
-      await handleWebhook(req.body as Buffer, req.get('stripe-signature') ?? '');
+      await handleWebhook(
+        req.body as Buffer,
+        req.get('x-razorpay-signature') ?? '',
+        // Razorpay sends a unique id per event; retries of the same event repeat it.
+        req.get('x-razorpay-event-id') ?? randomUUID(),
+      );
       res.json({ received: true });
     } catch (err) {
       if (err instanceof InvalidSignatureError) {
-        logger.warn('Stripe webhook with an invalid signature');
+        logger.warn('Razorpay webhook with an invalid signature');
         res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid signature' } });
         return;
       }
-      throw err; // 500: Stripe will retry.
+      throw err; // 500: Razorpay will retry.
     }
   },
 );

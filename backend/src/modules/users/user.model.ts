@@ -8,7 +8,6 @@ const userSchema = new Schema(
     username: { type: String, required: true, unique: true, trim: true },
     avatarUrl: { type: String, default: null },
     plan: { type: String, enum: PLAN_IDS, default: 'free', required: true },
-    stripeCustomerId: { type: String, default: null },
   },
   { timestamps: true },
 );

@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Logo } from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
-import { billingQuery, useCheckout, usePortal } from '@/features/billing/api';
+import { billingQuery, useCheckout } from '@/features/billing/api';
 import { IntervalToggle, PlanCard, TestModeNote } from '@/features/billing/plan-cards';
 
 export const Route = createFileRoute('/pricing')({
@@ -20,7 +20,7 @@ export const Route = createFileRoute('/pricing')({
 const FAQ = [
   [
     'What happens to my projects if I cancel?',
-    'Nothing is deleted. You keep Pro until the end of the period you paid for, then move to Free. If you own more projects than Free allows, you can still open them, but you can’t create new ones.',
+    'Nothing is deleted. Cancel from your billing settings and you keep Pro until the end of the period you paid for, then move to Free. If you own more projects than Free allows, you can still open them, but you can’t create new ones.',
   ],
   [
     'Who pays when a project has several people?',
@@ -33,12 +33,11 @@ const FAQ = [
 ] as const;
 
 function Pricing() {
-  const { checkout } = Route.useSearch();
+  const { checkout } = Route.useSearch(); // Kept for links from older flows.
   const { isSignedIn } = useAuth();
   const [interval, setBillingInterval] = useState<BillingInterval>('month');
   const { data: billing } = useQuery({ ...billingQuery, enabled: !!isSignedIn });
   const startCheckout = useCheckout();
-  const portal = usePortal();
 
   useEffect(() => {
     if (checkout === 'canceled') toast('Checkout canceled. You haven’t been charged.');
@@ -53,14 +52,8 @@ function Pricing() {
       </Link>
     </Button>
   ) : isPro ? (
-    <Button
-      size="lg"
-      variant="secondary"
-      className="w-full"
-      disabled={portal.isPending}
-      onClick={() => portal.mutate()}
-    >
-      Manage billing
+    <Button asChild size="lg" variant="secondary" className="w-full">
+      <Link to="/settings/billing">Manage your plan</Link>
     </Button>
   ) : (
     <Button
@@ -69,7 +62,7 @@ function Pricing() {
       disabled={startCheckout.isPending || billing?.enabled === false}
       onClick={() => startCheckout.mutate(interval)}
     >
-      {startCheckout.isPending ? 'Opening checkout…' : `Upgrade to Pro`}
+      {startCheckout.isPending ? 'Opening Razorpay…' : 'Upgrade to Pro'}
     </Button>
   );
 

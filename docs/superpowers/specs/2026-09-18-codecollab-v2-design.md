@@ -138,7 +138,8 @@ Limits are enforced on the backend (the source of truth). The UI reads the same 
   - the user always has to accept before anything changes
 - Metering records tokens and cost (from a price table in `models.ts`) per request into UsageCounter, with structured log lines.
 
-### 6. Billing (Stripe test mode)
+### 6. Billing (Razorpay test mode)
+- **Changed 2026-09-19:** Stripe onboarding in India is invite-only, so billing moved to Razorpay (INR). Razorpay has no hosted customer portal: cancelling is built into the Billing page. The original Stripe design below is kept for reference.
 - `billing/provider.ts` defines the `BillingProvider` interface (`createCheckout`, `createPortal`, `parseWebhook`); `stripe.provider.ts` implements it.
 - Routes:
   - `POST /api/v1/billing/checkout` (Checkout Session, subscription mode, monthly/yearly)

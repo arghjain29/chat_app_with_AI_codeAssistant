@@ -1,6 +1,7 @@
 import { PLANS, type BillingInterval, type PlanId } from '@codecollab/shared';
 import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { formatInr } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /** Monthly / yearly switch. */
@@ -73,7 +74,7 @@ export function PlanCard({
       <p className="mt-1 text-sm text-ink-muted">{p.tagline}</p>
       <p className="mt-6 flex items-baseline gap-1.5">
         <span className="font-display text-5xl font-semibold tracking-tight tabular-nums">
-          ${price}
+          {formatInr(price)}
         </span>
         <span className="text-sm text-ink-muted">
           {price === 0 ? 'forever' : interval === 'month' ? 'per month' : 'per year'}
@@ -81,7 +82,7 @@ export function PlanCard({
       </p>
       {plan === 'pro' && interval === 'year' && (
         <p className="mt-1 text-xs text-ink-muted">
-          ${(p.price.yearly / 12).toFixed(2)} a month, billed yearly
+          {formatInr(Math.round(p.price.yearly / 12))} a month, billed yearly
         </p>
       )}
       <ul className="mt-6 grid gap-2.5 text-sm">
@@ -100,13 +101,23 @@ export function PlanCard({
   );
 }
 
-/** Explains test-mode payments, with the card to use. */
+/** Explains test-mode payments, with what to pay with. */
 export function TestModeNote() {
   return (
     <p className="rounded-lg border border-marigold/50 bg-marigold/10 px-4 py-3 text-sm">
-      <span className="font-medium">Payments are in test mode.</span> No real money moves. Pay with
-      card <code className="rounded bg-surface px-1 font-mono">4242 4242 4242 4242</code>, any
-      future expiry date and any CVC.
+      <span className="font-medium">Payments are in test mode.</span> No real money moves. On the
+      Razorpay page, pay with the UPI ID{' '}
+      <code className="rounded bg-surface px-1 font-mono">success@razorpay</code> or one of
+      Razorpay’s{' '}
+      <a
+        href="https://razorpay.com/docs/payments/payments/test-card-details/"
+        target="_blank"
+        rel="noreferrer"
+        className="underline"
+      >
+        test cards
+      </a>
+      .
     </p>
   );
 }

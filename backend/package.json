@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "stripe:setup": "tsx scripts/stripe-setup.ts"
+    "razorpay:setup": "tsx scripts/razorpay-setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
@@ -25,7 +25,7 @@
     "mongoose": "^9.10.1",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
-    "stripe": "^22.6.2",
+    "razorpay": "^2.9.8",
     "ws": "^8.21.3",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.32",

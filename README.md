@@ -1,6 +1,6 @@
 # CodeCollab
 
-A collaborative code workspace: a shared editor with live cursors, persistent team chat, and an AI pair-programmer everyone in the project can see. Free and Pro plans with Stripe subscriptions (test mode).
+A collaborative code workspace: a shared editor with live cursors, persistent team chat, and an AI pair-programmer everyone in the project can see. Free and Pro plans with Razorpay subscriptions (test mode).
 
 > **Status:** v2 rebuild in progress on the `v2` branch. The original v1 app lives in [`legacy/`](legacy/) for reference. The full design is in [`docs/superpowers/specs/2026-09-18-codecollab-v2-design.md`](docs/superpowers/specs/2026-09-18-codecollab-v2-design.md).
 
@@ -13,7 +13,7 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 | 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Done   |
 | 3     | Persistent chat: threads, reactions, mentions, unread                            | Done   |
 | 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection | Done   |
-| 5     | Billing: Stripe Checkout, Customer Portal, webhooks, entitlements                | Done   |
+| 5     | Billing: Razorpay subscriptions, verified webhooks, cancel, entitlements         | Done   |
 | 6     | Polish: landing page, onboarding, Sentry, Playwright e2e, deploy                 | Next   |
 
 ## Stack
@@ -76,17 +76,16 @@ Mention `@ai` in a project's chat. The answer streams to everyone in the project
 - **Limits:** per-plan quotas (Free: 30 requests/day, Pro: 1,500/month), a per-minute rate limit, one answer at a time per person, and a daily spending ceiling for the whole app (`AI_DAILY_BUDGET_USD`). Viewers can't ask the AI. Requests that produce nothing are refunded.
 - **Safety:** project files and chat are passed as delimited, untrusted data; suggested paths are validated like any file path; nothing changes until a person accepts; and a suggestion is refused if a file changed after the AI read it.
 
-## Payments (Stripe, test mode)
+## Payments (Razorpay, test mode)
 
-Free and Pro plans (`shared/src/plans.ts`). Upgrading goes through Stripe Checkout; card changes, invoices and cancellation go through the Stripe customer portal. The plan only changes when a **verified Stripe webhook** says so: the success page never grants anything by itself.
+Free and Pro plans, priced in INR (`shared/src/plans.ts`: ₹799/month or ₹7,990/year). Upgrading opens Razorpay's hosted subscription page in a new tab while CodeCollab waits for confirmation. The plan only changes when a **verified Razorpay webhook** says so; the confirmation page never grants anything by itself.
 
-1. Create a free Stripe account, stay in **test mode**, and copy the secret key into `backend/.env` as `STRIPE_SECRET_KEY` (`sk_test_…`).
-2. Create the Pro product and prices once: `npm run stripe:setup -w backend` (safe to re-run; refuses live keys).
-3. Forward webhooks while developing with the [Stripe CLI](https://docs.stripe.com/stripe-cli): `stripe listen --forward-to localhost:3000/webhooks/stripe`, and put the `whsec_…` it prints in `STRIPE_WEBHOOK_SECRET`. In production, add an endpoint in the Stripe dashboard for `checkout.session.completed` and `customer.subscription.*`.
-4. In the Stripe dashboard, turn on the customer portal (Settings → Billing → Customer portal).
-5. Pay with the test card `4242 4242 4242 4242`, any future date and any CVC.
+1. Sign up at [razorpay.com](https://razorpay.com), switch the dashboard to **Test Mode**, and generate test API keys (**Account & Settings → API Keys**). Put them in `backend/.env` as `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET`.
+2. Create the Pro plans once: `npm run razorpay:setup -w backend` (safe to re-run; refuses live keys).
+3. Add a webhook (**Account & Settings → Webhooks**) pointing at `https://<your-api>/webhooks/razorpay` with the `subscription.*` events, choose a secret, and put it in `RAZORPAY_WEBHOOK_SECRET`. Razorpay can't reach `localhost`, so in development expose the API with a tunnel, for example `cloudflared tunnel --url http://localhost:3000`.
+4. Pay with the UPI ID `success@razorpay` or one of Razorpay's [test cards](https://razorpay.com/docs/payments/payments/test-card-details/).
 
-Webhook deliveries are verified, processed once (retries are ignored), and always re-read the subscription from Stripe so late or out-of-order events can't leave a stale plan. `past_due` keeps Pro during payment retries; cancellation takes effect at the end of the paid period. Deleting an account cancels its subscription. Billing sits behind a small `BillingProvider` interface (`backend/src/modules/billing/provider.ts`) so another provider, such as Razorpay, can be added.
+Webhook deliveries are verified (HMAC-SHA256), processed once per `x-razorpay-event-id`, and always re-read the subscription from Razorpay, so late or out-of-order events can't leave a stale plan. A failed renewal (`pending`) keeps Pro while Razorpay retries; cancelling from **Billing** takes effect at the end of the paid period. Deleting an account cancels its subscription. Billing sits behind a small `BillingProvider` interface (`backend/src/modules/billing/provider.ts`).
 
 ## API conventions
 

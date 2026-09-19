@@ -11,7 +11,7 @@ import { logger } from '../../lib/logger.js';
 import { UserModel, type UserDoc } from '../users/user.model.js';
 import { ProcessedWebhookModel, SubscriptionModel } from './billing.model.js';
 import type { BillingProvider, ProviderSubscription } from './provider.js';
-import { stripeProvider } from './stripe.provider.js';
+import { razorpayProvider } from './razorpay.provider.js';
 
 class BillingUnavailableError extends AppError {
   constructor() {
@@ -22,9 +22,14 @@ class BillingUnavailableError extends AppError {
 let provider: BillingProvider | null | undefined;
 function billing(): BillingProvider | null {
   if (provider === undefined) {
-    provider = env.STRIPE_SECRET_KEY
-      ? stripeProvider(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET)
-      : null;
+    provider =
+      env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET
+        ? razorpayProvider(
+            env.RAZORPAY_KEY_ID,
+            env.RAZORPAY_KEY_SECRET,
+            env.RAZORPAY_WEBHOOK_SECRET,
+          )
+        : null;
   }
   return provider;
 }
@@ -39,7 +44,7 @@ export function setBillingProviderForTesting(fake: BillingProvider | null | unde
   provider = fake;
 }
 
-const appUrl = (path: string) => `${env.FRONTEND_URL[0]}${path}`;
+const isPro = (status: string) => PRO_STATUSES.includes(status as SubscriptionStatus);
 
 export async function getBillingSummary(user: UserDoc): Promise<BillingSummary> {
   const p = billing();
@@ -56,91 +61,106 @@ export async function getBillingSummary(user: UserDoc): Promise<BillingSummary> 
           cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
         }
       : null,
-    canManage: !!p && !!user.stripeCustomerId,
+    canCancel: !!p && !!sub && isPro(sub.status) && !sub.cancelAtPeriodEnd,
   };
 }
 
+/**
+ * Start (or resume) a checkout. Returns Razorpay's hosted payment page. Nothing is granted
+ * here: Pro switches on when the webhook reports the subscription active.
+ */
 export async function startCheckout(user: UserDoc, interval: BillingInterval) {
   const p = requireBilling();
   const existing = await SubscriptionModel.findOne({ userId: user._id });
-  if (existing && PRO_STATUSES.includes(existing.status as SubscriptionStatus)) {
+  if (existing && isPro(existing.status)) {
     throw new ConflictError('You’re already on Pro. Manage your plan from billing settings.');
   }
-  const customerId = await p.ensureCustomer({
-    id: user.id as string,
-    email: user.email,
-    customerId: user.stripeCustomerId ?? null,
-  });
-  if (customerId !== user.stripeCustomerId) {
-    user.stripeCustomerId = customerId;
-    await user.save();
+  // Reopened checkout for the same plan: reuse the payment page instead of a new subscription.
+  if (existing?.status === 'incomplete' && existing.interval === interval && existing.checkoutUrl) {
+    return { url: existing.checkoutUrl };
   }
-  const url = await p.createCheckout({
-    customerId,
+  if (existing?.status === 'incomplete') {
+    await p.cancelNow(existing.subscriptionId).catch(() => undefined); // Abandoned checkout.
+  }
+
+  const { subscriptionId, url } = await p.createCheckout({
     userId: user.id as string,
+    email: user.email,
     interval,
-    successUrl: appUrl('/billing/success'),
-    cancelUrl: appUrl('/pricing?checkout=canceled'),
   });
+  await SubscriptionModel.findOneAndUpdate(
+    { userId: user._id },
+    {
+      provider: p.name,
+      subscriptionId,
+      status: 'incomplete',
+      interval,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      checkoutUrl: url,
+    },
+    { upsert: true },
+  );
   return { url };
 }
 
-export async function openPortal(user: UserDoc) {
+/** Stop renewing. Pro stays until the end of the paid period, then the webhook ends it. */
+export async function cancelSubscription(user: UserDoc) {
   const p = requireBilling();
-  if (!user.stripeCustomerId) {
-    throw new ConflictError('There’s no billing account yet. Upgrade to Pro first.');
-  }
-  const url = await p.createPortal({
-    customerId: user.stripeCustomerId,
-    returnUrl: appUrl('/settings/billing'),
-  });
-  return { url };
+  const sub = await SubscriptionModel.findOne({ userId: user._id });
+  if (!sub || !isPro(sub.status)) throw new ConflictError('You don’t have an active subscription.');
+  if (sub.cancelAtPeriodEnd) throw new ConflictError('Your subscription is already set to end.');
+  await p.cancelAtPeriodEnd(sub.subscriptionId);
+  sub.cancelAtPeriodEnd = true;
+  await sub.save();
+  return getBillingSummary(user);
 }
 
 /**
  * Store the provider's view of a subscription and set the user's plan from it. This is the
- * only place a plan changes: the checkout success page never grants anything by itself.
+ * only place a plan changes.
  */
 export async function syncSubscription(sub: ProviderSubscription) {
-  const user =
-    (sub.userId && Types.ObjectId.isValid(sub.userId)
-      ? await UserModel.findById(sub.userId)
-      : null) ?? (await UserModel.findOne({ stripeCustomerId: sub.customerId }));
+  const record = await SubscriptionModel.findOne({ subscriptionId: sub.id });
+  const userId =
+    record?.userId ?? (sub.userId && Types.ObjectId.isValid(sub.userId) ? sub.userId : null);
+  const user = userId ? await UserModel.findById(userId) : null;
   if (!user) {
     logger.warn({ subscription: sub.id }, 'Subscription for an unknown user');
     return;
   }
 
+  // An older, replaced checkout reporting in late mustn't overwrite the current subscription.
+  const current = await SubscriptionModel.findOne({ userId: user._id });
+  if (current && current.subscriptionId !== sub.id && !isPro(sub.status)) return;
+
   await SubscriptionModel.findOneAndUpdate(
     { userId: user._id },
     {
-      provider: 'stripe',
-      customerId: sub.customerId,
+      provider: 'razorpay',
       subscriptionId: sub.id,
       status: sub.status,
-      interval: sub.interval,
+      interval: sub.interval ?? current?.interval ?? null,
       currentPeriodEnd: sub.currentPeriodEnd,
-      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      // Razorpay doesn't report a scheduled cancellation, so keep ours until it takes effect.
+      cancelAtPeriodEnd: isPro(sub.status) ? (current?.cancelAtPeriodEnd ?? false) : false,
+      ...(sub.status !== 'incomplete' ? { checkoutUrl: null } : {}),
     },
     { upsert: true },
   );
 
-  const plan = PRO_STATUSES.includes(sub.status) ? 'pro' : 'free';
-  if (user.plan !== plan || user.stripeCustomerId !== sub.customerId) {
+  const plan = isPro(sub.status) ? 'pro' : 'free';
+  if (user.plan !== plan) {
     user.plan = plan;
-    user.stripeCustomerId = sub.customerId;
     await user.save();
     logger.info({ userId: user.id, plan, status: sub.status }, 'Plan changed');
   }
 }
 
-/**
- * Handle a webhook delivery. Returns false when the signature is invalid. Each event is
- * processed once, however many times the provider retries it.
- */
-export async function handleWebhook(rawBody: Buffer, signature: string) {
+/** Handle a webhook delivery. Each event is processed once, however often it's retried. */
+export async function handleWebhook(rawBody: Buffer, signature: string, eventId: string) {
   const p = requireBilling();
-  const event = await p.parseWebhook(rawBody, signature);
+  const event = await p.parseWebhook(rawBody, signature, eventId);
 
   try {
     await ProcessedWebhookModel.create({ provider: p.name, eventId: event.id });
@@ -163,7 +183,7 @@ export async function cancelSubscriptionsFor(userId: Types.ObjectId) {
   const sub = await SubscriptionModel.findOne({ userId });
   if (!sub) return;
   const p = billing();
-  if (p && PRO_STATUSES.includes(sub.status as SubscriptionStatus)) {
+  if (p && (isPro(sub.status) || sub.status === 'incomplete')) {
     await p
       .cancelNow(sub.subscriptionId)
       .catch((err) =>

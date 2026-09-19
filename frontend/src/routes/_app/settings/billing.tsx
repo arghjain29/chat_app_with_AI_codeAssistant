@@ -1,9 +1,11 @@
 import { PLANS } from '@codecollab/shared';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { CreditCard, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { billingQuery, usePortal } from '@/features/billing/api';
+import { useState } from 'react';
+import { Dialog, DialogClose, DialogContent, DialogFooter } from '@/components/ui/dialog';
+import { billingQuery, useCancelSubscription, useCheckout } from '@/features/billing/api';
 import { TestModeNote } from '@/features/billing/plan-cards';
 import { usageQuery } from '@/features/chat/chat-api';
 import { projectsQuery } from '@/features/projects/api';
@@ -52,7 +54,9 @@ function BillingSettings() {
   const { data: billing, error } = useQuery(billingQuery);
   const { data: usage } = useQuery(usageQuery);
   const { data: projects } = useQuery(projectsQuery);
-  const portal = usePortal();
+  const cancel = useCancelSubscription();
+  const resume = useCheckout();
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   if (error) {
     return (
@@ -79,7 +83,7 @@ function BillingSettings() {
               {billing.plan === 'pro' && <Sparkles className="size-5 text-cobalt" aria-hidden />}
               {plan.name}
             </p>
-            {sub && sub.status !== 'canceled' ? (
+            {sub && !['canceled', 'incomplete_expired'].includes(sub.status) ? (
               <p className="mt-2 text-sm text-ink-muted">
                 <span
                   className={cn(
@@ -104,16 +108,17 @@ function BillingSettings() {
             )}
           </div>
           <div className="flex gap-2">
-            {billing.canManage && (
-              <Button
-                variant="secondary"
-                disabled={portal.isPending}
-                onClick={() => portal.mutate()}
-              >
-                <CreditCard /> {portal.isPending ? 'Opening…' : 'Manage billing'}
+            {sub?.status === 'incomplete' && sub.interval && (
+              <Button disabled={resume.isPending} onClick={() => resume.mutate(sub.interval!)}>
+                Continue payment
               </Button>
             )}
-            {billing.plan === 'free' && billing.enabled && (
+            {billing.canCancel && (
+              <Button variant="secondary" onClick={() => setConfirmCancel(true)}>
+                Cancel subscription
+              </Button>
+            )}
+            {billing.plan === 'free' && billing.enabled && sub?.status !== 'incomplete' && (
               <Button asChild>
                 <Link to="/pricing" search={{ checkout: undefined }}>
                   <Sparkles /> Upgrade to Pro
@@ -122,9 +127,9 @@ function BillingSettings() {
             )}
           </div>
         </div>
-        {billing.canManage && (
+        {sub?.cancelAtPeriodEnd && billing.plan === 'pro' && (
           <p className="mt-4 border-t border-line pt-4 text-xs text-ink-muted">
-            Change your card, download invoices or cancel in the billing portal, run by Stripe.
+            You can upgrade again once this period ends.
           </p>
         )}
       </section>
@@ -145,6 +150,30 @@ function BillingSettings() {
           </p>
         </div>
       </section>
+
+      <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <DialogContent
+          title="Cancel your subscription?"
+          description={
+            sub?.currentPeriodEnd
+              ? `You keep Pro until ${formatDate(sub.currentPeriodEnd)}, then move to Free. Nothing is deleted.`
+              : 'You keep Pro until the end of this period, then move to Free. Nothing is deleted.'
+          }
+        >
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary">Keep Pro</Button>
+            </DialogClose>
+            <Button
+              variant="danger"
+              disabled={cancel.isPending}
+              onClick={() => cancel.mutate(undefined, { onSettled: () => setConfirmCancel(false) })}
+            >
+              {cancel.isPending ? 'Cancelling…' : 'Cancel subscription'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {billing.enabled && billing.testMode && (
         <div className="mt-6">
