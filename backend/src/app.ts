@@ -10,6 +10,7 @@ import { logger } from './lib/logger.js';
 import { isRedisReady } from './lib/redis.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { requestId } from './middleware/requestId.js';
+import { billingRouter, stripeWebhookRouter } from './modules/billing/billing.routes.js';
 import { inviteRouter } from './modules/projects/invite.routes.js';
 import { projectRouter } from './modules/projects/project.routes.js';
 import { userRouter } from './modules/users/user.routes.js';
@@ -51,6 +52,7 @@ export function createApp(): Express {
 
   // Webhooks verify signatures against the raw body, so mount them before JSON parsing.
   app.use('/webhooks/clerk', clerkWebhookRouter);
+  app.use('/webhooks/stripe', stripeWebhookRouter);
 
   app.use(express.json({ limit: '1mb' }));
 
@@ -76,6 +78,7 @@ export function createApp(): Express {
   api.use('/users', userRouter);
   api.use('/projects', projectRouter);
   api.use('/invites', inviteRouter);
+  api.use('/billing', billingRouter);
   app.use('/api/v1', api);
 
   app.use(notFound);

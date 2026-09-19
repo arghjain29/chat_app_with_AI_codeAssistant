@@ -56,6 +56,11 @@ const EnvSchema = z.object({
     .default('anthropic:claude-sonnet-5,gemini:gemini-3.1-pro-preview,gemini:gemini-3.8-flash'),
   /** Safety net: stop all AI answers for the day once estimated spend reaches this. */
   AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(2),
+
+  // Payments (Stripe). Without a key, billing is switched off and everyone stays on Free.
+  STRIPE_SECRET_KEY: optionalString,
+  /** From the Stripe dashboard webhook endpoint, or `stripe listen` when developing. */
+  STRIPE_WEBHOOK_SECRET: optionalString,
 });
 
 const parsed = EnvSchema.safeParse(process.env);
