@@ -84,7 +84,8 @@ The plan changes only when a **verified Razorpay webhook** reports the payment; 
 
 1. Sign up at [razorpay.com](https://razorpay.com), switch the dashboard to **Test Mode**, and generate test API keys (**Account & Settings → API Keys**). Put them in `backend/.env` as `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET`.
 2. Add a webhook (**Account & Settings → Webhooks**) pointing at `https://<your-api>/webhooks/razorpay` with the `payment_link.paid`, `payment_link.expired` and `payment_link.cancelled` events, choose a secret, and put it in `RAZORPAY_WEBHOOK_SECRET`. Razorpay can't reach `localhost`, so in development expose the API with a tunnel, for example `cloudflared tunnel --url http://localhost:3000`.
-3. Pay with the UPI ID `success@razorpay` or one of Razorpay's [test cards](https://razorpay.com/docs/payments/payments/test-card-details/).
+3. Pay with one of Razorpay's [test cards](https://razorpay.com/docs/payments/payments/test-card-details/). The hosted page always asks for a phone number; any 10-digit number works in test mode.
+4. UPI (including the test ID `success@razorpay`) only appears if UPI is enabled for the account under **Account & Settings → Payment Methods**, which usually needs a completed KYC. Cards and netbanking work without it.
 
 Without keys, billing is switched off and everyone stays on Free. Webhook deliveries are verified (HMAC-SHA256) and processed once per `x-razorpay-event-id`, and each payment extends Pro only once. Deleting an account closes any unpaid payment page. Billing sits behind a small `BillingProvider` interface (`backend/src/modules/billing/provider.ts`).
 

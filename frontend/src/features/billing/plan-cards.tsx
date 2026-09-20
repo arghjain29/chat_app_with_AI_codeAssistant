@@ -108,10 +108,8 @@ export function PlanCard({
 export function TestModeNote() {
   return (
     <p className="rounded-lg border border-marigold/50 bg-marigold/10 px-4 py-3 text-sm">
-      <span className="font-medium">Payments are in test mode.</span> No real money moves. On the
-      Razorpay page, pay with the UPI ID{' '}
-      <code className="rounded bg-surface px-1 font-mono">success@razorpay</code> or one of
-      Razorpay’s{' '}
+      <span className="font-medium">Payments are in test mode.</span> No real money moves. Razorpay
+      asks for a phone number — any 10-digit number works. Pay with one of Razorpay’s{' '}
       <a
         href="https://razorpay.com/docs/payments/payments/test-card-details/"
         target="_blank"
@@ -120,7 +118,8 @@ export function TestModeNote() {
       >
         test cards
       </a>
-      .
+      , or the UPI ID <code className="rounded bg-surface px-1 font-mono">success@razorpay</code> if
+      UPI is switched on for the account.
     </p>
   );
 }
