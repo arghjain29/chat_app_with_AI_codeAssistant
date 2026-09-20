@@ -1,16 +1,11 @@
-import {
-  PRO_STATUSES,
-  type BillingInterval,
-  type BillingSummary,
-  type SubscriptionStatus,
-} from '@codecollab/shared';
+import type { BillingInterval, BillingSummary } from '@codecollab/shared';
 import { Types } from 'mongoose';
 import { env } from '../../env.js';
-import { AppError, ConflictError } from '../../lib/errors.js';
+import { AppError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { UserModel, type UserDoc } from '../users/user.model.js';
-import { ProcessedWebhookModel, SubscriptionModel } from './billing.model.js';
-import type { BillingProvider, ProviderSubscription } from './provider.js';
+import { ProcessedWebhookModel, ProPassModel } from './billing.model.js';
+import type { BillingProvider, PaymentRecord } from './provider.js';
 import { razorpayProvider } from './razorpay.provider.js';
 
 class BillingUnavailableError extends AppError {
@@ -44,117 +39,116 @@ export function setBillingProviderForTesting(fake: BillingProvider | null | unde
   provider = fake;
 }
 
-const isPro = (status: string) => PRO_STATUSES.includes(status as SubscriptionStatus);
+/** Where Razorpay sends people back to after they pay. */
+const returnUrl = () => `${env.FRONTEND_URL[0]}/billing/success`;
+
+/** One period of Pro added to `from`, by the calendar (a month is a month, not 30 days). */
+export function addInterval(from: Date, interval: BillingInterval): Date {
+  const end = new Date(from);
+  if (interval === 'year') end.setFullYear(end.getFullYear() + 1);
+  else end.setMonth(end.getMonth() + 1);
+  return end;
+}
 
 export async function getBillingSummary(user: UserDoc): Promise<BillingSummary> {
   const p = billing();
-  const sub = await SubscriptionModel.findOne({ userId: user._id });
+  const pass = await ProPassModel.findOne({ userId: user._id });
+  const active = user.plan === 'pro' && !!user.proUntil;
   return {
     plan: user.plan,
     enabled: !!p,
     testMode: p?.testMode ?? true,
-    subscription: sub
-      ? {
-          status: sub.status as SubscriptionStatus,
-          interval: (sub.interval as BillingInterval | null) ?? null,
-          currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
-          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-        }
-      : null,
-    canCancel: !!p && !!sub && isPro(sub.status) && !sub.cancelAtPeriodEnd,
+    proUntil: active ? (user.proUntil as Date).toISOString() : null,
+    interval: active ? ((pass?.interval as BillingInterval | null) ?? null) : null,
+    pending:
+      pass?.pendingUrl && pass.pendingInterval
+        ? { url: pass.pendingUrl, interval: pass.pendingInterval as BillingInterval }
+        : null,
   };
 }
 
 /**
- * Start (or resume) a checkout. Returns Razorpay's hosted payment page. Nothing is granted
- * here: Pro switches on when the webhook reports the subscription active.
+ * Start (or reopen) a checkout for one period of Pro, and return Razorpay's payment page.
+ * Nothing is granted here: Pro is extended when the paid webhook arrives.
  */
 export async function startCheckout(user: UserDoc, interval: BillingInterval) {
   const p = requireBilling();
-  const existing = await SubscriptionModel.findOne({ userId: user._id });
-  if (existing && isPro(existing.status)) {
-    throw new ConflictError('You’re already on Pro. Manage your plan from billing settings.');
-  }
-  // Reopened checkout for the same plan: reuse the payment page instead of a new subscription.
-  if (existing?.status === 'incomplete' && existing.interval === interval && existing.checkoutUrl) {
-    return { url: existing.checkoutUrl };
-  }
-  if (existing?.status === 'incomplete') {
-    await p.cancelNow(existing.subscriptionId).catch(() => undefined); // Abandoned checkout.
+  const pass = await ProPassModel.findOne({ userId: user._id });
+
+  // Reopened checkout for the same period: send them back to the same payment page.
+  if (pass?.pendingUrl && pass.pendingInterval === interval) return { url: pass.pendingUrl };
+  if (pass?.pendingLinkId) {
+    await p.cancelCheckout(pass.pendingLinkId).catch(() => undefined); // Abandoned checkout.
   }
 
-  const { subscriptionId, url } = await p.createCheckout({
+  const { linkId, url } = await p.createCheckout({
     userId: user.id as string,
     email: user.email,
     interval,
+    returnUrl: returnUrl(),
   });
-  await SubscriptionModel.findOneAndUpdate(
+  await ProPassModel.findOneAndUpdate(
     { userId: user._id },
     {
       provider: p.name,
-      subscriptionId,
-      status: 'incomplete',
-      interval,
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      checkoutUrl: url,
+      pendingLinkId: linkId,
+      pendingUrl: url,
+      pendingInterval: interval,
     },
     { upsert: true },
   );
   return { url };
 }
 
-/** Stop renewing. Pro stays until the end of the paid period, then the webhook ends it. */
-export async function cancelSubscription(user: UserDoc) {
-  const p = requireBilling();
-  const sub = await SubscriptionModel.findOne({ userId: user._id });
-  if (!sub || !isPro(sub.status)) throw new ConflictError('You don’t have an active subscription.');
-  if (sub.cancelAtPeriodEnd) throw new ConflictError('Your subscription is already set to end.');
-  await p.cancelAtPeriodEnd(sub.subscriptionId);
-  sub.cancelAtPeriodEnd = true;
-  await sub.save();
-  return getBillingSummary(user);
-}
-
 /**
- * Store the provider's view of a subscription and set the user's plan from it. This is the
- * only place a plan changes.
+ * Extend Pro for a paid payment page. This is the only place a plan becomes Pro, and each
+ * payment counts once however often Razorpay reports it.
  */
-export async function syncSubscription(sub: ProviderSubscription) {
-  const record = await SubscriptionModel.findOne({ subscriptionId: sub.id });
+export async function applyPayment(payment: PaymentRecord) {
+  const pass = await ProPassModel.findOne({ pendingLinkId: payment.linkId });
   const userId =
-    record?.userId ?? (sub.userId && Types.ObjectId.isValid(sub.userId) ? sub.userId : null);
+    pass?.userId ??
+    (payment.userId && Types.ObjectId.isValid(payment.userId) ? payment.userId : null);
   const user = userId ? await UserModel.findById(userId) : null;
   if (!user) {
-    logger.warn({ subscription: sub.id }, 'Subscription for an unknown user');
+    logger.warn({ link: payment.linkId }, 'Payment for an unknown user');
     return;
   }
+  const record = pass ?? (await ProPassModel.findOne({ userId: user._id }));
+  if (record?.lastPaymentId === payment.paymentId) return; // Already applied.
 
-  // An older, replaced checkout reporting in late mustn't overwrite the current subscription.
-  const current = await SubscriptionModel.findOne({ userId: user._id });
-  if (current && current.subscriptionId !== sub.id && !isPro(sub.status)) return;
+  const interval =
+    payment.interval ?? (record?.pendingInterval as BillingInterval | null) ?? 'month';
+  const now = new Date();
+  // A renewal bought early adds to what's left instead of throwing it away.
+  const base = user.proUntil && user.proUntil > now ? user.proUntil : now;
+  const proUntil = addInterval(base, interval);
 
-  await SubscriptionModel.findOneAndUpdate(
+  user.plan = 'pro';
+  user.proUntil = proUntil;
+  await user.save();
+
+  const clearPending = !record?.pendingLinkId || record.pendingLinkId === payment.linkId;
+  await ProPassModel.findOneAndUpdate(
     { userId: user._id },
     {
       provider: 'razorpay',
-      subscriptionId: sub.id,
-      status: sub.status,
-      interval: sub.interval ?? current?.interval ?? null,
-      currentPeriodEnd: sub.currentPeriodEnd,
-      // Razorpay doesn't report a scheduled cancellation, so keep ours until it takes effect.
-      cancelAtPeriodEnd: isPro(sub.status) ? (current?.cancelAtPeriodEnd ?? false) : false,
-      ...(sub.status !== 'incomplete' ? { checkoutUrl: null } : {}),
+      proUntil,
+      interval,
+      lastPaymentId: payment.paymentId,
+      ...(clearPending ? { pendingLinkId: null, pendingUrl: null, pendingInterval: null } : {}),
     },
     { upsert: true },
   );
+  logger.info({ userId: user.id, interval, proUntil }, 'Pro extended');
+}
 
-  const plan = isPro(sub.status) ? 'pro' : 'free';
-  if (user.plan !== plan) {
-    user.plan = plan;
-    await user.save();
-    logger.info({ userId: user.id, plan, status: sub.status }, 'Plan changed');
-  }
+/** A payment page expired or was cancelled: stop offering it as unfinished. */
+export async function clearPendingCheckout(linkId: string) {
+  await ProPassModel.findOneAndUpdate(
+    { pendingLinkId: linkId },
+    { pendingLinkId: null, pendingUrl: null, pendingInterval: null },
+  );
 }
 
 /** Handle a webhook delivery. Each event is processed once, however often it's retried. */
@@ -170,7 +164,8 @@ export async function handleWebhook(rawBody: Buffer, signature: string, eventId:
   }
 
   try {
-    if (event.kind === 'subscription') await syncSubscription(event.subscription);
+    if (event.kind === 'paid') await applyPayment(event.payment);
+    else if (event.kind === 'link-closed') await clearPendingCheckout(event.linkId);
   } catch (err) {
     // Let the provider retry: forget that we saw it.
     await ProcessedWebhookModel.deleteOne({ provider: p.name, eventId: event.id });
@@ -178,17 +173,15 @@ export async function handleWebhook(rawBody: Buffer, signature: string, eventId:
   }
 }
 
-/** Account deletion: stop charging immediately. */
-export async function cancelSubscriptionsFor(userId: Types.ObjectId) {
-  const sub = await SubscriptionModel.findOne({ userId });
-  if (!sub) return;
+/** Account deletion: close any unpaid payment page and forget the pass. */
+export async function closeBillingFor(userId: Types.ObjectId) {
+  const pass = await ProPassModel.findOne({ userId });
+  if (!pass) return;
   const p = billing();
-  if (p && (isPro(sub.status) || sub.status === 'incomplete')) {
+  if (p && pass.pendingLinkId) {
     await p
-      .cancelNow(sub.subscriptionId)
-      .catch((err) =>
-        logger.error({ err, subscription: sub.subscriptionId }, 'Could not cancel subscription'),
-      );
+      .cancelCheckout(pass.pendingLinkId)
+      .catch((err) => logger.error({ err, link: pass.pendingLinkId }, 'Could not cancel payment'));
   }
-  await sub.deleteOne();
+  await pass.deleteOne();
 }

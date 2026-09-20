@@ -19,7 +19,10 @@ export const as = (clerkId: string) => {
 /** Create (or fetch) a user by signing them in, optionally setting their plan. */
 export async function signUp(clerkId: string, plan: PlanId = 'free') {
   const res = await as(clerkId).get('/api/v1/users/me').expect(200);
-  if (plan !== 'free') await UserModel.updateOne({ clerkId }, { plan });
+  // Pro is a prepaid pass, so it needs an expiry in the future to count.
+  if (plan !== 'free') {
+    await UserModel.updateOne({ clerkId }, { plan, proUntil: new Date(Date.now() + 30 * 864e5) });
+  }
   return { id: res.body.id as string, client: as(clerkId) };
 }
 

@@ -8,6 +8,8 @@ const userSchema = new Schema(
     username: { type: String, required: true, unique: true, trim: true },
     avatarUrl: { type: String, default: null },
     plan: { type: String, enum: PLAN_IDS, default: 'free', required: true },
+    /** When a Pro pass runs out. Past this, the user is back on Free. */
+    proUntil: { type: Date, default: null },
   },
   { timestamps: true },
 );

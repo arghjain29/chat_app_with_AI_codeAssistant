@@ -1,5 +1,5 @@
 import { Show, useAuth } from '@clerk/react';
-import type { BillingInterval } from '@codecollab/shared';
+import { INTERVAL_LABEL, type BillingInterval } from '@codecollab/shared';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
@@ -19,8 +19,12 @@ export const Route = createFileRoute('/pricing')({
 
 const FAQ = [
   [
-    'What happens to my projects if I cancel?',
-    'Nothing is deleted. Cancel from your billing settings and you keep Pro until the end of the period you paid for, then move to Free. If you own more projects than Free allows, you can still open them, but you can’t create new ones.',
+    'Does Pro renew by itself?',
+    'No. You pay for a month or a year up front, and Pro runs until that date. There is nothing to cancel: if you don’t extend it, the account simply goes back to Free.',
+  ],
+  [
+    'What happens to my projects when Pro ends?',
+    'Nothing is deleted. If you own more projects than Free allows, you can still open and edit them, but you can’t create new ones until you extend Pro again.',
   ],
   [
     'Who pays when a project has several people?',
@@ -40,7 +44,7 @@ function Pricing() {
   const startCheckout = useCheckout();
 
   useEffect(() => {
-    if (checkout === 'canceled') toast('Checkout canceled. You haven’t been charged.');
+    if (checkout === 'canceled') toast('Payment cancelled. You haven’t been charged.');
   }, [checkout]);
 
   const isPro = billing?.plan === 'pro';
@@ -62,7 +66,7 @@ function Pricing() {
       disabled={startCheckout.isPending || billing?.enabled === false}
       onClick={() => startCheckout.mutate(interval)}
     >
-      {startCheckout.isPending ? 'Opening Razorpay…' : 'Upgrade to Pro'}
+      {startCheckout.isPending ? 'Opening Razorpay…' : `Get Pro for ${INTERVAL_LABEL[interval]}`}
     </Button>
   );
 

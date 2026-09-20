@@ -1,17 +1,20 @@
-import type { BillingInterval, SubscriptionStatus } from '@codecollab/shared';
+import type { BillingInterval } from '@codecollab/shared';
 
-/** A subscription as the app sees it, whatever the payment provider. */
-export interface ProviderSubscription {
-  id: string;
-  status: SubscriptionStatus;
-  interval: BillingInterval | null;
-  currentPeriodEnd: Date | null;
-  /** Our user id, stored on the subscription when checkout starts. */
+/** A completed payment, as the app sees it. */
+export interface PaymentRecord {
+  /** The payment page that was paid. */
+  linkId: string;
+  /** The payment itself, used to apply each payment only once. */
+  paymentId: string;
+  /** Our user id, stored on the payment page when checkout starts. */
   userId: string | null;
+  interval: BillingInterval | null;
 }
 
 export type BillingEvent =
-  | { id: string; kind: 'subscription'; subscription: ProviderSubscription }
+  | { id: string; kind: 'paid'; payment: PaymentRecord }
+  /** The payment page expired or was cancelled without being paid. */
+  | { id: string; kind: 'link-closed'; linkId: string }
   | { id: string; kind: 'ignored'; type: string };
 
 /**
@@ -22,16 +25,15 @@ export interface BillingProvider {
   name: 'razorpay';
   /** True when no real money moves (test keys). */
   testMode: boolean;
-  /** Start a subscription and return the hosted page where the customer pays. */
+  /** Create a payment page for one period of Pro. */
   createCheckout(input: {
     userId: string;
     email: string;
     interval: BillingInterval;
-  }): Promise<{ subscriptionId: string; url: string }>;
-  /** Stop renewing: Pro stays until the end of the period already paid for. */
-  cancelAtPeriodEnd(subscriptionId: string): Promise<void>;
-  /** Stop immediately (account deleted, or an abandoned checkout replaced). */
-  cancelNow(subscriptionId: string): Promise<void>;
+    returnUrl: string;
+  }): Promise<{ linkId: string; url: string }>;
+  /** Close a payment page that's no longer needed. */
+  cancelCheckout(linkId: string): Promise<void>;
   /** Verify the signature and turn the payload into an event. Throws if the signature is bad. */
   parseWebhook(rawBody: Buffer, signature: string, eventId: string): Promise<BillingEvent>;
 }

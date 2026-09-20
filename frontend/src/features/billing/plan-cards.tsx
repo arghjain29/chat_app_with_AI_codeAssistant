@@ -77,13 +77,16 @@ export function PlanCard({
           {formatInr(price)}
         </span>
         <span className="text-sm text-ink-muted">
-          {price === 0 ? 'forever' : interval === 'month' ? 'per month' : 'per year'}
+          {price === 0 ? 'forever' : interval === 'month' ? 'for a month' : 'for a year'}
         </span>
       </p>
       {plan === 'pro' && interval === 'year' && (
         <p className="mt-1 text-xs text-ink-muted">
-          {formatInr(Math.round(p.price.yearly / 12))} a month, billed yearly
+          Works out at {formatInr(Math.round(p.price.yearly / 12))} a month
         </p>
+      )}
+      {plan === 'pro' && (
+        <p className="mt-1 text-xs text-ink-muted">Paid up front, doesn’t renew by itself</p>
       )}
       <ul className="mt-6 grid gap-2.5 text-sm">
         {p.features.map((f) => (

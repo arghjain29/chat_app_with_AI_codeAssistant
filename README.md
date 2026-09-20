@@ -1,6 +1,6 @@
 # CodeCollab
 
-A collaborative code workspace: a shared editor with live cursors, persistent team chat, and an AI pair-programmer everyone in the project can see. Free and Pro plans with Razorpay subscriptions (test mode).
+A collaborative code workspace: a shared editor with live cursors, persistent team chat, and an AI pair-programmer everyone in the project can see. Free and Pro plans with Razorpay payments (test mode).
 
 > **Status:** v2 rebuild in progress on the `v2` branch. The original v1 app lives in [`legacy/`](legacy/) for reference. The full design is in [`docs/superpowers/specs/2026-09-18-codecollab-v2-design.md`](docs/superpowers/specs/2026-09-18-codecollab-v2-design.md).
 
@@ -13,7 +13,7 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 | 2     | Workspace: file tree, live co-editing (Yjs), in-browser run & preview            | Done   |
 | 3     | Persistent chat: threads, reactions, mentions, unread                            | Done   |
 | 4     | AI gateway: multi-provider, streaming, diff proposals, quotas & abuse protection | Done   |
-| 5     | Billing: Razorpay subscriptions, verified webhooks, cancel, entitlements         | Done   |
+| 5     | Billing: Razorpay payments, verified webhooks, prepaid Pro passes, entitlements  | Done   |
 | 6     | Polish: landing page, onboarding, Sentry, Playwright e2e, deploy                 | Next   |
 
 ## Stack
@@ -78,14 +78,15 @@ Mention `@ai` in a project's chat. The answer streams to everyone in the project
 
 ## Payments (Razorpay, test mode)
 
-Free and Pro plans, priced in INR (`shared/src/plans.ts`: ₹799/month or ₹7,990/year). Upgrading opens Razorpay's hosted subscription page in a new tab while CodeCollab waits for confirmation. The plan only changes when a **verified Razorpay webhook** says so; the confirmation page never grants anything by itself.
+Pro is a **prepaid pass**: one payment buys one period (`shared/src/plans.ts`: ₹799 for a month or ₹7,990 for a year), and Pro runs until that date. Nothing auto-renews, so there is nothing to cancel — the account goes back to Free by itself when the pass runs out, and extending early adds to the time that's left. This uses Razorpay **Payment Links**, which every account has; Subscriptions are gated for new accounts.
+
+The plan changes only when a **verified Razorpay webhook** reports the payment; the page people land on after paying never grants anything by itself.
 
 1. Sign up at [razorpay.com](https://razorpay.com), switch the dashboard to **Test Mode**, and generate test API keys (**Account & Settings → API Keys**). Put them in `backend/.env` as `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET`.
-2. Create the Pro plans once: `npm run razorpay:setup -w backend` (safe to re-run; refuses live keys).
-3. Add a webhook (**Account & Settings → Webhooks**) pointing at `https://<your-api>/webhooks/razorpay` with the `subscription.*` events, choose a secret, and put it in `RAZORPAY_WEBHOOK_SECRET`. Razorpay can't reach `localhost`, so in development expose the API with a tunnel, for example `cloudflared tunnel --url http://localhost:3000`.
-4. Pay with the UPI ID `success@razorpay` or one of Razorpay's [test cards](https://razorpay.com/docs/payments/payments/test-card-details/).
+2. Add a webhook (**Account & Settings → Webhooks**) pointing at `https://<your-api>/webhooks/razorpay` with the `payment_link.paid`, `payment_link.expired` and `payment_link.cancelled` events, choose a secret, and put it in `RAZORPAY_WEBHOOK_SECRET`. Razorpay can't reach `localhost`, so in development expose the API with a tunnel, for example `cloudflared tunnel --url http://localhost:3000`.
+3. Pay with the UPI ID `success@razorpay` or one of Razorpay's [test cards](https://razorpay.com/docs/payments/payments/test-card-details/).
 
-Webhook deliveries are verified (HMAC-SHA256), processed once per `x-razorpay-event-id`, and always re-read the subscription from Razorpay, so late or out-of-order events can't leave a stale plan. A failed renewal (`pending`) keeps Pro while Razorpay retries; cancelling from **Billing** takes effect at the end of the paid period. Deleting an account cancels its subscription. Billing sits behind a small `BillingProvider` interface (`backend/src/modules/billing/provider.ts`).
+Without keys, billing is switched off and everyone stays on Free. Webhook deliveries are verified (HMAC-SHA256) and processed once per `x-razorpay-event-id`, and each payment extends Pro only once. Deleting an account closes any unpaid payment page. Billing sits behind a small `BillingProvider` interface (`backend/src/modules/billing/provider.ts`).
 
 ## API conventions
 

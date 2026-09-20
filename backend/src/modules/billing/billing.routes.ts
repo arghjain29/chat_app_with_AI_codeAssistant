@@ -4,12 +4,7 @@ import express, { Router } from 'express';
 import { logger } from '../../lib/logger.js';
 import { currentUser, requireUser } from '../../middleware/auth.js';
 import { parseBody } from '../../middleware/validate.js';
-import {
-  cancelSubscription,
-  getBillingSummary,
-  handleWebhook,
-  startCheckout,
-} from './billing.service.js';
+import { getBillingSummary, handleWebhook, startCheckout } from './billing.service.js';
 import { InvalidSignatureError } from './provider.js';
 
 /** Mounted at /api/v1/billing. */
@@ -23,10 +18,6 @@ billingRouter.get('/', async (req, res) => {
 billingRouter.post('/checkout', async (req, res) => {
   const { interval } = parseBody(CheckoutInputSchema, req);
   res.json(await startCheckout(currentUser(req), interval));
-});
-
-billingRouter.post('/cancel', async (req, res) => {
-  res.json(await cancelSubscription(currentUser(req)));
 });
 
 /** Mounted at /webhooks/razorpay, before JSON parsing: the signature covers the raw bytes. */

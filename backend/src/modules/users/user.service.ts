@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Me } from '@codecollab/shared';
 import { fetchClerkProfile, type ClerkProfile } from '../../lib/clerk.js';
 import { logger } from '../../lib/logger.js';
-import { cancelSubscriptionsFor } from '../billing/billing.service.js';
+import { closeBillingFor } from '../billing/billing.service.js';
 import { ReadStateModel } from '../chat/message.model.js';
 import { MembershipModel } from '../projects/membership.model.js';
 import { ProjectModel } from '../projects/project.model.js';
@@ -58,12 +58,24 @@ export async function upsertUserFromProfile(profile: ClerkProfile): Promise<User
 }
 
 /**
+ * Pro is prepaid, so it simply runs out: drop back to Free once the pass has expired.
+ * Checked whenever the user is loaded, which is on every authenticated request.
+ */
+export async function applyPlanExpiry(user: UserDoc): Promise<UserDoc> {
+  if (user.plan !== 'pro') return user;
+  if (user.proUntil && user.proUntil > new Date()) return user;
+  user.plan = 'free';
+  logger.info({ userId: user.id }, 'Pro pass expired');
+  return user.save();
+}
+
+/**
  * Local user for a Clerk id. Creates it on first sight so the app works even
  * before the Clerk webhook is configured (e.g. local development).
  */
 export async function findOrCreateUserByClerkId(clerkId: string): Promise<UserDoc> {
   const user = await UserModel.findOne({ clerkId });
-  if (user) return user;
+  if (user) return applyPlanExpiry(user);
   logger.info({ clerkId }, 'Creating local user on first request');
   return upsertUserFromProfile(await fetchClerkProfile(clerkId));
 }
@@ -77,7 +89,7 @@ export async function deleteUserByClerkId(clerkId: string): Promise<void> {
   await MembershipModel.deleteMany({ userId: user._id });
   // Their messages stay in other projects' history, shown as from a deleted user.
   await ReadStateModel.deleteMany({ userId: user._id });
-  await cancelSubscriptionsFor(user._id);
+  await closeBillingFor(user._id);
   await user.deleteOne();
 }
 
