@@ -4,7 +4,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { billingQuery, useCheckout } from '@/features/billing/api';
+import { billingQuery, useCheckout, useCheckPendingPayment } from '@/features/billing/api';
 import { IntervalToggle, TestModeNote } from '@/features/billing/plan-cards';
 import { usageQuery } from '@/features/chat/chat-api';
 import { projectsQuery } from '@/features/projects/api';
@@ -48,6 +48,8 @@ function BillingSettings() {
   const { data: projects } = useQuery(projectsQuery);
   const checkout = useCheckout();
   const [interval, setInterval] = useState<BillingInterval>('month');
+  // An unfinished payment may simply be one whose webhook never arrived, so ask Razorpay.
+  useCheckPendingPayment({ enabled: !!billing?.pending });
 
   if (error) {
     return (
@@ -97,6 +99,7 @@ function BillingSettings() {
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
             <p className="text-sm">
               You have an unfinished payment for {INTERVAL_LABEL[billing.pending.interval]} of Pro.
+              If you’ve already paid, this clears by itself in a moment.
             </p>
             <Button
               variant="secondary"

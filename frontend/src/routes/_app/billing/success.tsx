@@ -1,38 +1,33 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { meQuery } from '@/features/auth/use-me';
-import { billingQuery } from '@/features/billing/api';
+import { useCheckPendingPayment } from '@/features/billing/api';
 import { usageQuery } from '@/features/chat/chat-api';
 
 export const Route = createFileRoute('/_app/billing/success')({
   component: CheckoutWaiting,
 });
 
-// Razorpay usually calls the webhook within seconds, but allow for a slow delivery.
+// Razorpay usually confirms within seconds, but allow for a slow settlement.
 const GIVE_UP_AFTER_MS = 5 * 60_000;
+const CHECK_EVERY_MS = 3000;
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 
 /**
- * Where Razorpay sends people after paying. Pro is extended by the webhook, not by this page,
- * so it waits for the server to confirm: the payment is done once Pro is on and nothing is
- * left pending.
+ * Where Razorpay sends people after paying. This page never grants anything: it asks the server
+ * to check the payment with Razorpay, and the payment is done once Pro is on with nothing left
+ * pending.
  */
 function CheckoutWaiting() {
   const qc = useQueryClient();
   const [startedAt] = useState(() => Date.now());
   const [timedOut, setTimedOut] = useState(false);
-  const { data } = useQuery({
-    ...billingQuery,
-    refetchInterval: (q) => {
-      const d = q.state.data;
-      return (d?.plan === 'pro' && !d.pending) || timedOut ? false : 2000;
-    },
-  });
+  const data = useCheckPendingPayment({ every: timedOut ? false : CHECK_EVERY_MS });
   const confirmed = !!data && data.plan === 'pro' && !data.pending;
 
   useEffect(() => {
@@ -66,7 +61,7 @@ function CheckoutWaiting() {
         <>
           <h1 className="font-display text-2xl font-semibold">Still waiting for Razorpay</h1>
           <p className="mt-2 text-ink-muted">
-            We haven’t heard about a payment yet. If you paid, it usually shows up within a minute
+            Razorpay hasn’t confirmed a payment yet. If you paid, it usually lands within a minute
             and your plan updates by itself. Otherwise, go back and try again.
           </p>
           <Button asChild variant="secondary" className="mt-6">

@@ -69,7 +69,7 @@ export async function getBillingSummary(user: UserDoc): Promise<BillingSummary> 
 
 /**
  * Start (or reopen) a checkout for one period of Pro, and return Razorpay's payment page.
- * Nothing is granted here: Pro is extended when the paid webhook arrives.
+ * Nothing is granted here: Pro is extended once Razorpay confirms the payment.
  */
 export async function startCheckout(user: UserDoc, interval: BillingInterval) {
   const p = requireBilling();
@@ -141,6 +141,30 @@ export async function applyPayment(payment: PaymentRecord) {
     { upsert: true },
   );
   logger.info({ userId: user.id, interval, proUntil }, 'Pro extended');
+}
+
+/**
+ * Ask Razorpay what happened to an unfinished payment, and apply it. Webhooks are the normal
+ * path, but they can be slow, misconfigured, or unable to reach a local server, so the app also
+ * checks for itself when someone comes back from paying. The answer comes from Razorpay, never
+ * from the browser, so this grants nothing on its own.
+ */
+export async function checkPendingPayment(user: UserDoc): Promise<BillingSummary> {
+  const p = billing();
+  const pass = await ProPassModel.findOne({ userId: user._id });
+
+  if (p && pass?.pendingLinkId) {
+    const linkId = pass.pendingLinkId;
+    try {
+      const status = await p.checkoutStatus(linkId);
+      if (status.state === 'paid') await applyPayment(status.payment);
+      else if (status.state === 'closed') await clearPendingCheckout(linkId);
+    } catch (err) {
+      logger.error({ err, link: linkId }, 'Could not check a payment with Razorpay');
+    }
+  }
+  // applyPayment works on its own copy of the user, so read the plan back.
+  return getBillingSummary((await UserModel.findById(user._id)) ?? user);
 }
 
 /** A payment page expired or was cancelled: stop offering it as unfinished. */

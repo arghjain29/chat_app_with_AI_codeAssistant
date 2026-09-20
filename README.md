@@ -80,7 +80,7 @@ Mention `@ai` in a project's chat. The answer streams to everyone in the project
 
 Pro is a **prepaid pass**: one payment buys one period (`shared/src/plans.ts`: ₹799 for a month or ₹7,990 for a year), and Pro runs until that date. Nothing auto-renews, so there is nothing to cancel — the account goes back to Free by itself when the pass runs out, and extending early adds to the time that's left. This uses Razorpay **Payment Links**, which every account has; Subscriptions are gated for new accounts.
 
-The plan changes only when a **verified Razorpay webhook** reports the payment; the page people land on after paying never grants anything by itself.
+The plan changes only when Razorpay says the payment happened, never because the browser says so. Two paths report it: a **verified webhook** (`payment_link.paid`), and, when someone returns from paying, the server reading the payment page back from Razorpay's API (`POST /api/v1/billing/check`). Either one is enough, and each payment is applied once, so a local server with no webhook tunnel still works.
 
 1. Sign up at [razorpay.com](https://razorpay.com), switch the dashboard to **Test Mode**, and generate test API keys (**Account & Settings → API Keys**). Put them in `backend/.env` as `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET`.
 2. Add a webhook (**Account & Settings → Webhooks**) pointing at `https://<your-api>/webhooks/razorpay` with the `payment_link.paid`, `payment_link.expired` and `payment_link.cancelled` events, choose a secret, and put it in `RAZORPAY_WEBHOOK_SECRET`. Razorpay can't reach `localhost`, so in development expose the API with a tunnel, for example `cloudflared tunnel --url http://localhost:3000`.

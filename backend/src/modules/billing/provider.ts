@@ -11,6 +11,14 @@ export interface PaymentRecord {
   interval: BillingInterval | null;
 }
 
+/** What the provider says about a payment page when we ask it directly. */
+export type CheckoutStatus =
+  | { state: 'paid'; payment: PaymentRecord }
+  /** Still waiting to be paid. */
+  | { state: 'open' }
+  /** Cancelled or expired without being paid. */
+  | { state: 'closed' };
+
 export type BillingEvent =
   | { id: string; kind: 'paid'; payment: PaymentRecord }
   /** The payment page expired or was cancelled without being paid. */
@@ -34,6 +42,8 @@ export interface BillingProvider {
   }): Promise<{ linkId: string; url: string }>;
   /** Close a payment page that's no longer needed. */
   cancelCheckout(linkId: string): Promise<void>;
+  /** Read a payment page back from the provider, for when a webhook never arrives. */
+  checkoutStatus(linkId: string): Promise<CheckoutStatus>;
   /** Verify the signature and turn the payload into an event. Throws if the signature is bad. */
   parseWebhook(rawBody: Buffer, signature: string, eventId: string): Promise<BillingEvent>;
 }

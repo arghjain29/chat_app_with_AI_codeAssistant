@@ -4,7 +4,12 @@ import express, { Router } from 'express';
 import { logger } from '../../lib/logger.js';
 import { currentUser, requireUser } from '../../middleware/auth.js';
 import { parseBody } from '../../middleware/validate.js';
-import { getBillingSummary, handleWebhook, startCheckout } from './billing.service.js';
+import {
+  checkPendingPayment,
+  getBillingSummary,
+  handleWebhook,
+  startCheckout,
+} from './billing.service.js';
 import { InvalidSignatureError } from './provider.js';
 
 /** Mounted at /api/v1/billing. */
@@ -13,6 +18,11 @@ billingRouter.use(requireUser);
 
 billingRouter.get('/', async (req, res) => {
   res.json(await getBillingSummary(currentUser(req)));
+});
+
+/** Re-check an unfinished payment with the provider (the webhook may be late or missing). */
+billingRouter.post('/check', async (req, res) => {
+  res.json(await checkPendingPayment(currentUser(req)));
 });
 
 billingRouter.post('/checkout', async (req, res) => {

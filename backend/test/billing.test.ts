@@ -7,6 +7,8 @@ import {
   InvalidSignatureError,
   type BillingEvent,
   type BillingProvider,
+  type CheckoutStatus,
+  type PaymentRecord,
 } from '../src/modules/billing/provider.js';
 import { razorpayProvider } from '../src/modules/billing/razorpay.provider.js';
 import { UserModel } from '../src/modules/users/user.model.js';
@@ -18,7 +20,9 @@ const DAY = 864e5;
 
 /** A fake provider whose webhook payload is simply the event as JSON, signed with "good". */
 function fakeProvider() {
-  const calls = { checkouts: 0, canceled: [] as string[] };
+  const calls = { checkouts: 0, canceled: [] as string[], statusChecks: [] as string[] };
+  /** What the provider will say the next time a payment page is looked up. */
+  const status: { next: CheckoutStatus } = { next: { state: 'open' } };
   const provider: BillingProvider = {
     name: 'razorpay',
     testMode: true,
@@ -32,13 +36,17 @@ function fakeProvider() {
     async cancelCheckout(id) {
       calls.canceled.push(id);
     },
+    async checkoutStatus(id) {
+      calls.statusChecks.push(id);
+      return status.next;
+    },
     async parseWebhook(raw, signature, eventId) {
       if (signature !== 'good') throw new InvalidSignatureError('bad');
       return { ...(JSON.parse(raw.toString()) as BillingEvent), id: eventId };
     },
   };
   setBillingProviderForTesting(provider);
-  return calls;
+  return { calls, status };
 }
 
 afterEach(() => setBillingProviderForTesting(undefined));
@@ -73,7 +81,7 @@ describe('billing summary', () => {
 
 describe('buying Pro', () => {
   it('returns the hosted payment page and reuses it if reopened', async () => {
-    const calls = fakeProvider();
+    const { calls } = fakeProvider();
     const alice = await signUp('alice');
     const first = await alice.client.post(`${B}/checkout`, { interval: 'year' }).expect(200);
     expect(first.body.url).toBe('https://rzp.test/year/1');
@@ -86,7 +94,7 @@ describe('buying Pro', () => {
   });
 
   it('replaces an unpaid payment page when the period changes', async () => {
-    const calls = fakeProvider();
+    const { calls } = fakeProvider();
     const alice = await signUp('alice');
     await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
     const res = await alice.client.post(`${B}/checkout`, { interval: 'year' }).expect(200);
@@ -144,6 +152,57 @@ describe('buying Pro', () => {
   });
 });
 
+describe('checking a payment directly', () => {
+  it('turns Pro on when the webhook never arrives', async () => {
+    const { calls, status } = fakeProvider();
+    const alice = await signUp('alice');
+    await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
+
+    // Nothing has been reported yet, so the payment page is still open.
+    let res = await alice.client.post(`${B}/check`).expect(200);
+    expect(res.body).toMatchObject({ plan: 'free', pending: { interval: 'month' } });
+
+    status.next = {
+      state: 'paid',
+      payment: { linkId: 'link_1', paymentId: 'pay_1', userId: alice.id, interval: 'month' },
+    };
+    res = await alice.client.post(`${B}/check`).expect(200);
+    expect(res.body).toMatchObject({ plan: 'pro', pending: null });
+    expect(calls.statusChecks).toEqual(['link_1', 'link_1']);
+
+    // With nothing pending, there is nothing left to ask about.
+    await alice.client.post(`${B}/check`).expect(200);
+    expect(calls.statusChecks).toHaveLength(2);
+  });
+
+  it('does not extend Pro twice when the webhook arrives as well', async () => {
+    const { status } = fakeProvider();
+    const alice = await signUp('alice');
+    await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
+    const payment: PaymentRecord = {
+      linkId: 'link_1',
+      paymentId: 'pay_1',
+      userId: alice.id,
+      interval: 'month',
+    };
+
+    status.next = { state: 'paid', payment };
+    const checked = await alice.client.post(`${B}/check`).expect(200);
+    await deliver({ kind: 'paid', payment }).expect(200);
+    expect((await alice.client.get(B)).body.proUntil).toBe(checked.body.proUntil);
+  });
+
+  it('forgets a payment page the provider says is closed', async () => {
+    const { status } = fakeProvider();
+    const alice = await signUp('alice');
+    await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
+
+    status.next = { state: 'closed' };
+    const res = await alice.client.post(`${B}/check`).expect(200);
+    expect(res.body).toMatchObject({ plan: 'free', pending: null });
+  });
+});
+
 describe('when Pro runs out', () => {
   it('moves the account back to Free', async () => {
     fakeProvider();
@@ -157,7 +216,7 @@ describe('when Pro runs out', () => {
   });
 
   it('closes an unpaid payment page when the account is deleted', async () => {
-    const calls = fakeProvider();
+    const { calls } = fakeProvider();
     const alice = await signUp('alice');
     await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
 
