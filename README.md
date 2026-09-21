@@ -22,7 +22,7 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 - **backend/**: Node 22+, Express 5, Mongoose (MongoDB), ioredis (optional), pino, Clerk, Zod
 - **shared/**: Zod schemas, types, plan limits and error codes used by both apps
 
-It is one git repo with three npm workspaces. The frontend deploys to Vercel (root directory `frontend`), and the backend deploys to Render (root directory `backend`).
+It is one git repo with three npm workspaces. The web app deploys to Vercel and the API to Render, both from the repository root (`vercel.json` and `render.yaml`). Step-by-step instructions are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Local setup
 

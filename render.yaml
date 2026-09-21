@@ -1,0 +1,51 @@
+# Render Blueprint for the CodeCollab API (Express + the Yjs collaboration socket).
+# Render reads this from the repo root: New -> Blueprint -> pick this repository.
+# Values marked `sync: false` are secrets: Render asks for them on first deploy and
+# they are never stored in git.
+services:
+  - type: web
+    name: codecollab-api
+    runtime: node
+    plan: free
+    region: singapore # Closest free region to India; any region works.
+    branch: v2 # Change to main once v2 is merged.
+    buildCommand: npm ci && npm run build -w backend
+    startCommand: npm run start -w backend
+    # Render restarts the service if this stops answering.
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      # The web app's origin, e.g. https://codecollab.vercel.app. Comma-separated for
+      # more than one. This is both the CORS allowlist and the WebSocket origin check,
+      # so a wrong value shows up as "blocked by CORS" in the browser console.
+      - key: FRONTEND_URL
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_WEBHOOK_SIGNING_SECRET
+        sync: false
+      # AI: one key is enough. Without any, the app runs and @ai explains it's unavailable.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_DAILY_BUDGET_USD
+        value: '2'
+      # Payments: without these, billing is switched off and everyone stays on Free.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      # Redis is optional: rate limits and caches fall back to in-memory without it.
+      # Add REDIS_URL (or REDIS_HOST/PORT/PASSWORD/TLS) in the dashboard if you use one.
