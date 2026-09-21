@@ -61,6 +61,12 @@ provider's dashboard.
 takes up to a minute to wake it. The web app's reconnect logic handles this, but the first page
 load after idle feels slow. That's the free tier, not a bug.
 
+To keep it awake, the `Keep API awake` workflow (`.github/workflows/keep-alive.yml`) pings
+`/health` every 14 minutes. Turn it on by adding a repository **variable** (not a secret) named
+`BACKEND_URL` with the API's address: GitHub → Settings → Secrets and variables → Actions →
+Variables. Until it's set, the workflow does nothing. Run it once by hand from the Actions tab to
+check it's green.
+
 ## 4. Web app on Vercel
 
 1. **Add New → Project**, import this repository.
