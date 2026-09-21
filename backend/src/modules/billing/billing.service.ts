@@ -100,9 +100,73 @@ export async function startCheckout(user: UserDoc, interval: BillingInterval) {
   return { url };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+interface Grant {
+  /** Razorpay payment id, or `admin:<timestamp>` for time added by hand. */
+  paymentId: string;
+  source: 'razorpay' | 'admin';
+  interval: BillingInterval | null;
+  /** Where Pro ends, given where it would otherwise end (or now, if it had run out). */
+  extend: (from: Date) => Date;
+}
+
 /**
- * Extend Pro for a paid payment page. This is the only place a plan becomes Pro, and each
- * payment counts once however often Razorpay reports it.
+ * Add Pro time to a user, once per grant. The pass update doubles as the claim: it only
+ * matches while the grant is unrecorded, so a webhook and a direct check racing on the same
+ * payment can't both apply it. Returns false if it was already applied.
+ */
+async function addProTime(user: UserDoc, grant: Grant, paidLinkId?: string) {
+  const now = new Date();
+  // Buying early adds to what's left instead of throwing it away.
+  const base = user.proUntil && user.proUntil > now ? user.proUntil : now;
+  const proUntil = grant.extend(base);
+
+  const pass = await ProPassModel.findOne({ userId: user._id });
+  const clearPending =
+    paidLinkId !== undefined && (!pass?.pendingLinkId || pass.pendingLinkId === paidLinkId);
+  try {
+    await ProPassModel.updateOne(
+      {
+        userId: user._id,
+        'grants.paymentId': { $ne: grant.paymentId },
+        lastPaymentId: { $ne: grant.paymentId },
+      },
+      {
+        $set: {
+          provider: 'razorpay',
+          proUntil,
+          ...(grant.interval ? { interval: grant.interval } : {}),
+          ...(clearPending ? { pendingLinkId: null, pendingUrl: null, pendingInterval: null } : {}),
+        },
+        $push: {
+          grants: {
+            paymentId: grant.paymentId,
+            source: grant.source,
+            interval: grant.interval,
+            addedMs: proUntil.getTime() - base.getTime(),
+            at: now,
+          },
+        },
+      },
+      { upsert: true },
+    );
+  } catch (err) {
+    // No match means the grant is already recorded; the upsert then collides on userId.
+    if ((err as { code?: number }).code === 11000) return false;
+    throw err;
+  }
+
+  user.plan = 'pro';
+  user.proUntil = proUntil;
+  await user.save();
+  logger.info({ userId: user.id, source: grant.source, proUntil }, 'Pro extended');
+  return true;
+}
+
+/**
+ * Extend Pro for a paid payment page. This is how a payment becomes Pro, and each payment
+ * counts once however often, and in whatever order, Razorpay reports it.
  */
 export async function applyPayment(payment: PaymentRecord) {
   const pass = await ProPassModel.findOne({ pendingLinkId: payment.linkId });
@@ -114,33 +178,78 @@ export async function applyPayment(payment: PaymentRecord) {
     logger.warn({ link: payment.linkId }, 'Payment for an unknown user');
     return;
   }
-  const record = pass ?? (await ProPassModel.findOne({ userId: user._id }));
-  if (record?.lastPaymentId === payment.paymentId) return; // Already applied.
-
-  const interval =
-    payment.interval ?? (record?.pendingInterval as BillingInterval | null) ?? 'month';
-  const now = new Date();
-  // A renewal bought early adds to what's left instead of throwing it away.
-  const base = user.proUntil && user.proUntil > now ? user.proUntil : now;
-  const proUntil = addInterval(base, interval);
-
-  user.plan = 'pro';
-  user.proUntil = proUntil;
-  await user.save();
-
-  const clearPending = !record?.pendingLinkId || record.pendingLinkId === payment.linkId;
-  await ProPassModel.findOneAndUpdate(
-    { userId: user._id },
+  const interval = payment.interval ?? (pass?.pendingInterval as BillingInterval | null) ?? 'month';
+  await addProTime(
+    user,
     {
-      provider: 'razorpay',
-      proUntil,
+      paymentId: payment.paymentId,
+      source: 'razorpay',
       interval,
-      lastPaymentId: payment.paymentId,
-      ...(clearPending ? { pendingLinkId: null, pendingUrl: null, pendingInterval: null } : {}),
+      extend: (from) => addInterval(from, interval),
     },
-    { upsert: true },
+    payment.linkId,
   );
-  logger.info({ userId: user.id, interval, proUntil }, 'Pro extended');
+}
+
+/**
+ * A payment was refunded in full: take back exactly the time it added. Anything bought
+ * separately is kept, and if nothing is left the account is back on Free straight away.
+ */
+export async function refundPayment(paymentId: string) {
+  const pass = await ProPassModel.findOne({ 'grants.paymentId': paymentId });
+  const grant = pass?.grants.find((g) => g.paymentId === paymentId);
+  if (!pass || !grant) {
+    const legacy = await ProPassModel.exists({ lastPaymentId: paymentId });
+    logger.warn(
+      { payment: paymentId },
+      legacy
+        ? 'Refund for a payment made before grants were recorded; adjust it with the pro script'
+        : 'Refund for a payment that never granted Pro',
+    );
+    return;
+  }
+
+  // Claim the refund, so a repeated webhook can't take the time back twice.
+  const claimed = await ProPassModel.updateOne(
+    { _id: pass._id, grants: { $elemMatch: { paymentId, refundedAt: null } } },
+    { $set: { 'grants.$.refundedAt': new Date() } },
+  );
+  if (claimed.modifiedCount === 0) return;
+
+  const user = await UserModel.findById(pass.userId);
+  if (!user?.proUntil) return; // Already on Free: nothing left to take back.
+  const until = new Date(user.proUntil.getTime() - grant.addedMs);
+  const stillPro = until > new Date();
+  user.plan = stillPro ? 'pro' : 'free';
+  user.proUntil = stillPro ? until : null;
+  await user.save();
+  await ProPassModel.updateOne({ _id: pass._id }, { $set: { proUntil: user.proUntil } });
+  logger.info({ userId: user.id, payment: paymentId, proUntil: user.proUntil }, 'Refund applied');
+}
+
+/** Add Pro by hand (support, demos, goodwill). Stacks on any time left, like a payment. */
+export async function adminGrantPro(user: UserDoc, amount: BillingInterval | { days: number }) {
+  const interval = typeof amount === 'string' ? amount : null;
+  await addProTime(user, {
+    paymentId: `admin:${Date.now()}`,
+    source: 'admin',
+    interval,
+    extend: (from) =>
+      typeof amount === 'string'
+        ? addInterval(from, amount)
+        : new Date(from.getTime() + amount.days * DAY_MS),
+  });
+  return user;
+}
+
+/** End Pro now, whatever was paid. Refund the payment in Razorpay separately if one is owed. */
+export async function adminRevokePro(user: UserDoc) {
+  user.plan = 'free';
+  user.proUntil = null;
+  await user.save();
+  await ProPassModel.updateOne({ userId: user._id }, { $set: { proUntil: null } });
+  logger.info({ userId: user.id }, 'Pro revoked by hand');
+  return user;
 }
 
 /**
@@ -190,6 +299,11 @@ export async function handleWebhook(rawBody: Buffer, signature: string, eventId:
   try {
     if (event.kind === 'paid') await applyPayment(event.payment);
     else if (event.kind === 'link-closed') await clearPendingCheckout(event.linkId);
+    else if (event.kind === 'refunded') {
+      // Partial refunds are goodwill gestures, not a reason to cut Pro short.
+      if (event.full) await refundPayment(event.paymentId);
+      else logger.info({ payment: event.paymentId }, 'Partial refund: Pro left unchanged');
+    }
   } catch (err) {
     // Let the provider retry: forget that we saw it.
     await ProcessedWebhookModel.deleteOne({ provider: p.name, eventId: event.id });

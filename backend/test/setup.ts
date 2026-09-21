@@ -23,6 +23,10 @@ let mongo: MongoMemoryServer;
 beforeAll(async () => {
   mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri());
+  // Build every model's indexes now. Left to the first query, that one-time cost lands inside
+  // whichever test runs first, and with every file starting its own database in parallel it
+  // can outlast the per-test timeout.
+  await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
 });
 
 afterEach(async () => {

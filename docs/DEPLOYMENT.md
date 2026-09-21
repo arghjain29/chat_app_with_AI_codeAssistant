@@ -103,7 +103,8 @@ domain each time, so they won't be allowed unless you add them.
 ## 7. Razorpay
 
 1. **Account & Settings → Webhooks → Add**: `https://<your-api>.onrender.com/webhooks/razorpay`.
-2. Tick `payment_link.paid`, `payment_link.expired` and `payment_link.cancelled`.
+2. Tick `payment_link.paid`, `payment_link.expired`, `payment_link.cancelled` and
+   `payment.refunded` (so a refund made in the dashboard also takes back the Pro it bought).
 3. Set a secret of your choosing and put the same value in `RAZORPAY_WEBHOOK_SECRET` on Render.
 4. Keep the dashboard in **Test Mode**. Real money never moves, and the app labels itself as test
    mode wherever it takes a payment.

@@ -2,7 +2,11 @@ import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProcessedWebhookModel, ProPassModel } from '../src/modules/billing/billing.model.js';
-import { setBillingProviderForTesting } from '../src/modules/billing/billing.service.js';
+import {
+  adminGrantPro,
+  adminRevokePro,
+  setBillingProviderForTesting,
+} from '../src/modules/billing/billing.service.js';
 import {
   InvalidSignatureError,
   type BillingEvent,
@@ -141,6 +145,19 @@ describe('buying Pro', () => {
     expect((await alice.client.get(B)).body.proUntil).toBe(first);
   });
 
+  it('does not re-apply an older payment reported after a newer one', async () => {
+    fakeProvider();
+    const alice = await signUp('alice');
+    await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
+    await deliver(paid('link_1', alice.id)).expect(200);
+    await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
+    await deliver(paid('link_2', alice.id)).expect(200);
+    const both = (await alice.client.get(B)).body.proUntil;
+
+    await deliver(paid('link_1', alice.id)).expect(200); // The first one again, new event id.
+    expect((await alice.client.get(B)).body.proUntil).toBe(both);
+  });
+
   it('forgets a payment page that expires unpaid', async () => {
     fakeProvider();
     const alice = await signUp('alice');
@@ -203,6 +220,97 @@ describe('checking a payment directly', () => {
   });
 });
 
+describe('refunds', () => {
+  const refund = (paymentId: string, full = true) => ({ kind: 'refunded', paymentId, full });
+
+  /** Buy a month, then a year on top: about 13 months of Pro from two payments. */
+  async function twoPayments() {
+    fakeProvider();
+    const alice = await signUp('alice');
+    await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
+    await deliver(paid('link_1', alice.id)).expect(200);
+    await alice.client.post(`${B}/checkout`, { interval: 'year' }).expect(200);
+    await deliver(paid('link_2', alice.id, { interval: 'year' })).expect(200);
+    return alice;
+  }
+
+  it('takes back exactly the time the refunded payment added', async () => {
+    const alice = await twoPayments();
+    await deliver(refund('pay_link_1')).expect(200);
+
+    const res = await alice.client.get(B).expect(200);
+    expect(res.body.plan).toBe('pro');
+    const left = daysFromNow(res.body.proUntil);
+    expect(left).toBeGreaterThanOrEqual(364); // The year is kept; only the month went back.
+    expect(left).toBeLessThanOrEqual(366);
+  });
+
+  it('puts the account back on Free straight away when nothing is left', async () => {
+    fakeProvider();
+    const alice = await signUp('alice');
+    await alice.client.post(`${B}/checkout`, { interval: 'month' }).expect(200);
+    await deliver(paid('link_1', alice.id)).expect(200);
+
+    await deliver(refund('pay_link_1')).expect(200);
+    const res = await alice.client.get(B).expect(200);
+    expect(res.body).toMatchObject({ plan: 'free', proUntil: null });
+  });
+
+  it('takes the time back once, however often the refund is reported', async () => {
+    const alice = await twoPayments();
+    await deliver(refund('pay_link_1')).expect(200);
+    const once = (await alice.client.get(B)).body.proUntil;
+
+    await deliver(refund('pay_link_1')).expect(200); // Same refund, new event id.
+    expect((await alice.client.get(B)).body.proUntil).toBe(once);
+  });
+
+  it('leaves Pro alone after a partial refund', async () => {
+    const alice = await twoPayments();
+    const before = (await alice.client.get(B)).body.proUntil;
+    await deliver(refund('pay_link_1', false)).expect(200);
+    expect((await alice.client.get(B)).body.proUntil).toBe(before);
+  });
+
+  it('ignores refunds for payments that never granted Pro', async () => {
+    const alice = await twoPayments();
+    const before = (await alice.client.get(B)).body.proUntil;
+    await deliver(refund('pay_somewhere_else')).expect(200);
+    expect((await alice.client.get(B)).body.proUntil).toBe(before);
+  });
+});
+
+describe('granting Pro by hand', () => {
+  it('adds a month or a number of days, stacking like a payment', async () => {
+    const alice = await signUp('alice');
+    const user = (await UserModel.findById(alice.id))!;
+
+    await adminGrantPro(user, 'month');
+    let res = await alice.client.get(B).expect(200);
+    expect(res.body.plan).toBe('pro');
+    const month = daysFromNow(res.body.proUntil);
+    expect(month).toBeGreaterThanOrEqual(28);
+
+    await adminGrantPro(user, { days: 10 });
+    res = await alice.client.get(B).expect(200);
+    expect(daysFromNow(res.body.proUntil)).toBe(month + 10);
+
+    const pass = await ProPassModel.findOne({ userId: alice.id });
+    expect(pass!.grants.map((g) => g.source)).toEqual(['admin', 'admin']);
+  });
+
+  it('revokes Pro immediately, whatever was paid', async () => {
+    fakeProvider();
+    const alice = await signUp('alice');
+    await alice.client.post(`${B}/checkout`, { interval: 'year' }).expect(200);
+    await deliver(paid('link_1', alice.id, { interval: 'year' })).expect(200);
+
+    await adminRevokePro((await UserModel.findById(alice.id))!);
+    const res = await alice.client.get(B).expect(200);
+    expect(res.body).toMatchObject({ plan: 'free', proUntil: null });
+  });
+});
+
 describe('when Pro runs out', () => {
   it('moves the account back to Free', async () => {
     fakeProvider();
@@ -239,12 +347,36 @@ describe('webhooks', () => {
     const event = paid('link_1', alice.id);
     await deliver(event, { eventId: 'evt_same' }).expect(200);
 
-    // Would be applied again if the retry weren't recognised.
-    await ProPassModel.updateOne({}, { lastPaymentId: null });
+    // Forget the payment itself, so only the event id stands between a retry and a second grant.
+    await ProPassModel.updateOne({}, { lastPaymentId: null, grants: [] });
     const before = (await alice.client.get(B)).body.proUntil;
     await deliver(event, { eventId: 'evt_same' }).expect(200);
     expect((await alice.client.get(B)).body.proUntil).toBe(before);
     expect(await ProcessedWebhookModel.countDocuments()).toBe(1);
+  });
+
+  it('reads a real Razorpay refund', async () => {
+    const provider = razorpayProvider('rzp_test_fake', 'key_secret', 'secret');
+    const event = (refund_status: 'full' | 'partial', amount_refunded: number) => {
+      const body = JSON.stringify({
+        event: 'payment.refunded',
+        payload: {
+          payment: {
+            entity: { id: 'pay_123', amount: 79900, amount_refunded, refund_status },
+          },
+        },
+      });
+      const signature = createHmac('sha256', 'secret').update(body).digest('hex');
+      return provider.parseWebhook(Buffer.from(body), signature, 'evt_refund');
+    };
+
+    await expect(event('full', 79900)).resolves.toEqual({
+      id: 'evt_refund',
+      kind: 'refunded',
+      paymentId: 'pay_123',
+      full: true,
+    });
+    await expect(event('partial', 20000)).resolves.toMatchObject({ full: false });
   });
 
   it('checks real Razorpay signatures', async () => {

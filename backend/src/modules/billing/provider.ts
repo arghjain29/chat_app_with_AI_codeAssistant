@@ -23,6 +23,8 @@ export type BillingEvent =
   | { id: string; kind: 'paid'; payment: PaymentRecord }
   /** The payment page expired or was cancelled without being paid. */
   | { id: string; kind: 'link-closed'; linkId: string }
+  /** Money went back to the customer; `full` when the whole payment was returned. */
+  | { id: string; kind: 'refunded'; paymentId: string; full: boolean }
   | { id: string; kind: 'ignored'; type: string };
 
 /**

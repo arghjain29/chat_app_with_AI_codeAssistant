@@ -8,7 +8,8 @@
     "build": "tsup",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pro": "tsx scripts/pro.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

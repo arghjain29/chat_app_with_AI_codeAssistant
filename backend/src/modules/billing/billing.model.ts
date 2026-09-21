@@ -1,8 +1,25 @@
 import { Schema, model, type HydratedDocument, type InferSchemaType } from 'mongoose';
 
 /**
+ * One grant of Pro: a payment, or time added by hand. Recording exactly how much time each
+ * one added lets a refund take back that same amount, and makes every payment count once.
+ */
+const grantSchema = new Schema(
+  {
+    /** The Razorpay payment id, or `admin:<timestamp>` for time added by hand. */
+    paymentId: { type: String, required: true },
+    source: { type: String, enum: ['razorpay', 'admin'], required: true },
+    interval: { type: String, enum: ['month', 'year', null], default: null },
+    addedMs: { type: Number, required: true },
+    at: { type: Date, required: true },
+    refundedAt: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
+/**
  * A user's Pro pass: what they paid for, until when, and any payment page still waiting
- * to be paid. Written only from verified webhooks and from starting a checkout.
+ * to be paid. Written from verified webhooks, from starting a checkout, and by the admin script.
  */
 const proPassSchema = new Schema(
   {
@@ -12,7 +29,9 @@ const proPassSchema = new Schema(
     proUntil: { type: Date, default: null },
     /** The period bought last time. */
     interval: { type: String, enum: ['month', 'year', null], default: null },
-    /** The last payment applied, so a repeated webhook can't extend Pro twice. */
+    /** Every grant, oldest first. */
+    grants: { type: [grantSchema], default: [] },
+    /** Before `grants` existed only the latest payment was kept; still honoured for old passes. */
     lastPaymentId: { type: String, default: null },
     /** A payment page that was opened but not paid yet. */
     pendingLinkId: { type: String, default: null },
@@ -22,6 +41,7 @@ const proPassSchema = new Schema(
   { timestamps: true },
 );
 proPassSchema.index({ pendingLinkId: 1 });
+proPassSchema.index({ 'grants.paymentId': 1 });
 
 export type ProPassDoc = HydratedDocument<InferSchemaType<typeof proPassSchema>>;
 export const ProPassModel = model('ProPass', proPassSchema);

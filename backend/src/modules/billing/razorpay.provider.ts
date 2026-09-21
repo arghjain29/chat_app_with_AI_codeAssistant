@@ -95,11 +95,29 @@ export function razorpayProvider(
         event: string;
         payload?: {
           payment_link?: { entity?: { id?: string; notes?: Record<string, unknown> } };
-          payment?: { entity?: { id?: string } };
+          payment?: {
+            entity?: {
+              id?: string;
+              amount?: number;
+              amount_refunded?: number;
+              refund_status?: 'full' | 'partial' | null;
+            };
+          };
         };
       };
-      const link = payload.payload?.payment_link?.entity;
       const ignored = { id: eventId, kind: 'ignored', type: payload.event } satisfies BillingEvent;
+
+      // Refunds are about a payment, not a payment page, so they carry no link.
+      if (payload.event === 'payment.refunded') {
+        const payment = payload.payload?.payment?.entity;
+        if (!payment?.id) return ignored;
+        const full =
+          payment.refund_status === 'full' ||
+          (!!payment.amount && (payment.amount_refunded ?? 0) >= payment.amount);
+        return { id: eventId, kind: 'refunded', paymentId: payment.id, full };
+      }
+
+      const link = payload.payload?.payment_link?.entity;
       if (!link?.id) return ignored;
 
       if (payload.event === 'payment_link.paid') {
