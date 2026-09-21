@@ -215,7 +215,9 @@ export function MessageItem({
                 'pointer-events-none absolute -top-4 flex items-center rounded-lg border border-line bg-surface opacity-0 shadow-sm transition-opacity',
                 'group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100',
                 'has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100',
-                mine ? 'left-1' : 'right-1',
+                // Anchored so it opens into the panel: your bubbles sit against the right
+                // edge, so the toolbar hangs off their right edge and widens the scroll area.
+                mine ? 'right-1' : 'left-1',
               )}
             >
               <DropdownMenu>
@@ -224,7 +226,7 @@ export function MessageItem({
                     <SmilePlus className="size-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align={mine ? 'start' : 'end'} className="min-w-0">
+                <DropdownMenuContent align={mine ? 'end' : 'start'} className="min-w-0">
                   <div className="grid grid-cols-4 gap-0.5">
                     {REACTIONS.map((emoji) => (
                       <DropdownMenuItem
@@ -258,7 +260,7 @@ export function MessageItem({
                       <MoreHorizontal className="size-4" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align={mine ? 'start' : 'end'}>
+                  <DropdownMenuContent align={mine ? 'end' : 'start'}>
                     {mine && (
                       <DropdownMenuItem
                         onSelect={() => {

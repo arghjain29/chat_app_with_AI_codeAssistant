@@ -317,7 +317,8 @@ export function ChatPanel({
         <div
           ref={scroller}
           onScroll={onScroll}
-          className="h-full overflow-y-auto py-2"
+          // Messages only ever scroll vertically; nothing beside a bubble should widen the panel.
+          className="h-full overflow-x-clip overflow-y-auto py-2"
           role="log"
           aria-live="polite"
           aria-label={threadId ? 'Thread messages' : 'Project chat'}
