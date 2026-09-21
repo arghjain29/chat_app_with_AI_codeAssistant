@@ -20,7 +20,7 @@ const summary = (over: Partial<BillingSummary> = {}): BillingSummary => ({
 
 /** Answer each call to POST /billing/check with the next summary in the list. */
 function serve(...replies: BillingSummary[]) {
-  const fetchMock = vi.fn(() => {
+  const fetchMock = vi.fn((_url: string, _init?: RequestInit) => {
     const body = replies.length > 1 ? replies.shift()! : replies[0]!;
     return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
   });
@@ -47,7 +47,7 @@ describe('checking an unfinished payment', () => {
     await waitFor(() => expect(result.current).toEqual(paid));
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('http://api.test/api/v1/billing/check');
-    expect((init as RequestInit).method).toBe('POST');
+    expect(init?.method).toBe('POST');
     // Every page reading billing now sees Pro, without fetching again.
     expect(client.getQueryData(billingQuery.queryKey)).toEqual(paid);
   });
