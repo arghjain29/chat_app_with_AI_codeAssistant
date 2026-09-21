@@ -8,7 +8,7 @@ services:
     runtime: node
     plan: free
     region: singapore # Closest free region to India; any region works.
-    branch: v2 # Change to main once v2 is merged.
+    branch: main
     buildCommand: npm ci && npm run build -w backend
     startCommand: npm run start -w backend
     # Render restarts the service if this stops answering.

@@ -4,7 +4,7 @@ A collaborative code workspace: a shared editor with live cursors, persistent te
 
 ![The CodeCollab landing page](docs/screenshots/landing.png)
 
-> **Status:** v2 rebuild in progress on the `v2` branch. The original v1 app lives in [`legacy/`](legacy/) for reference. The full design is in [`docs/superpowers/specs/2026-09-18-codecollab-v2-design.md`](docs/superpowers/specs/2026-09-18-codecollab-v2-design.md).
+> **Status:** v2 is the app on `main`. The original v1 app lives in [`legacy/`](legacy/) for reference. The full design is in [`docs/superpowers/specs/2026-09-18-codecollab-v2-design.md`](docs/superpowers/specs/2026-09-18-codecollab-v2-design.md).
 
 ## Roadmap
 
