@@ -9,7 +9,9 @@ services:
     plan: free
     region: singapore # Closest free region to India; any region works.
     branch: main
-    buildCommand: npm ci && npm run build -w backend
+    # --include=dev is required: NODE_ENV=production below applies to the build too,
+    # and without it npm skips devDependencies, so tsup (the bundler) is missing.
+    buildCommand: npm ci --include=dev && npm run build -w backend
     startCommand: npm run start -w backend
     # Render restarts the service if this stops answering.
     healthCheckPath: /health
