@@ -15,6 +15,16 @@ import { editorTheme } from './editor-theme';
 
 type Status = 'connecting' | 'ready' | 'denied';
 
+/** Wrapping is on unless this person turned it off (Alt+Z), on any file, in any session. */
+const WRAP_KEY = 'codecollab:wrap-lines';
+const storedWrap = () => {
+  try {
+    return localStorage.getItem(WRAP_KEY) !== 'false';
+  } catch {
+    return true; // Storage blocked (private windows): fall back to the default.
+  }
+};
+
 /**
  * A collaborative editor for one file. Everyone with the file open edits the same
  * Yjs document; their cursors and selections appear with their name and colour.
@@ -40,7 +50,14 @@ export function CodeEditor({
   });
   const view = useRef<EditorView | null>(null);
   const language = useRef(new Compartment());
+  const wrapping = useRef(new Compartment());
   const [status, setStatus] = useState<Status>('connecting');
+  const [wrap, setWrap] = useState(storedWrap);
+  // The keymap is built once, so it reads the current setting from here rather than closing over it.
+  const wrapNow = useRef(wrap);
+  useEffect(() => {
+    wrapNow.current = wrap;
+  });
 
   useEffect(() => {
     const provider = openDocument(fileDocName(fileId), {
@@ -64,6 +81,16 @@ export function CodeEditor({
           keymap.of([
             indentWithTab,
             {
+              key: 'Alt-z',
+              preventDefault: true,
+              run: () => {
+                const next = !wrapNow.current;
+                setWrap(next);
+                toast(next ? 'Lines wrap' : 'Lines scroll sideways', { id: 'wrap' });
+                return true;
+              },
+            },
+            {
               key: 'Mod-s',
               preventDefault: true,
               run: () => {
@@ -73,6 +100,7 @@ export function CodeEditor({
             },
           ]),
           language.current.of([]),
+          wrapping.current.of(wrapNow.current ? EditorView.lineWrapping : []),
           editorTheme,
           EditorState.readOnly.of(readOnly),
           EditorView.contentAttributes.of({ 'aria-label': `Code editor: ${path}` }),
@@ -93,6 +121,18 @@ export function CodeEditor({
     // `path` only affects the language (handled below) and the aria label.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileId, readOnly, me.id, me.username]);
+
+  // Apply the wrap setting to the open editor, and remember it for the next file and session.
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: wrapping.current.reconfigure(wrap ? EditorView.lineWrapping : []),
+    });
+    try {
+      localStorage.setItem(WRAP_KEY, String(wrap));
+    } catch {
+      // Nothing to remember it in; the setting still applies for this session.
+    }
+  }, [wrap]);
 
   // Load syntax support for the file type on demand (works for most languages).
   useEffect(() => {
