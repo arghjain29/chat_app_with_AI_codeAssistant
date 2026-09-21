@@ -42,8 +42,15 @@ export function razorpayProvider(
   keyId: string,
   keySecret: string,
   webhookSecret: string | undefined,
+  /** Tests pass a stand-in for the API client; everything else lets it be created here. */
+  rzp: Razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret }),
 ): BillingProvider {
-  const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+  /** Whether a payment has now been refunded in full, across however many refunds. */
+  const fullyRefunded = (p: {
+    amount?: number | string;
+    amount_refunded?: number;
+    refund_status?: string | null;
+  }) => p.refund_status === 'full' || (!!p.amount && (p.amount_refunded ?? 0) >= Number(p.amount));
 
   return {
     name: 'razorpay',
@@ -103,18 +110,20 @@ export function razorpayProvider(
               refund_status?: 'full' | 'partial' | null;
             };
           };
+          refund?: { entity?: { payment_id?: string } };
         };
       };
       const ignored = { id: eventId, kind: 'ignored', type: payload.event } satisfies BillingEvent;
 
-      // Refunds are about a payment, not a payment page, so they carry no link.
-      if (payload.event === 'payment.refunded') {
-        const payment = payload.payload?.payment?.entity;
-        if (!payment?.id) return ignored;
-        const full =
-          payment.refund_status === 'full' ||
-          (!!payment.amount && (payment.amount_refunded ?? 0) >= payment.amount);
-        return { id: eventId, kind: 'refunded', paymentId: payment.id, full };
+      // A refund has gone through (`refund.created` can still fail, so it's not acted on).
+      // It names the payment; whether that payment is now refunded in full comes from the
+      // payment itself, sent along with the event or else read back from Razorpay.
+      if (payload.event === 'refund.processed') {
+        const paymentId = payload.payload?.refund?.entity?.payment_id;
+        if (!paymentId) return ignored;
+        const sent = payload.payload?.payment?.entity;
+        const payment = sent?.id === paymentId ? sent : await rzp.payments.fetch(paymentId);
+        return { id: eventId, kind: 'refunded', paymentId, full: fullyRefunded(payment) };
       }
 
       const link = payload.payload?.payment_link?.entity;

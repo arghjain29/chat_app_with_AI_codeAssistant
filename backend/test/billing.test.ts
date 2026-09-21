@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import request from 'supertest';
-import { afterEach, describe, expect, it } from 'vitest';
+import type Razorpay from 'razorpay';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProcessedWebhookModel, ProPassModel } from '../src/modules/billing/billing.model.js';
 import {
   adminGrantPro,
@@ -355,28 +356,64 @@ describe('webhooks', () => {
     expect(await ProcessedWebhookModel.countDocuments()).toBe(1);
   });
 
-  it('reads a real Razorpay refund', async () => {
-    const provider = razorpayProvider('rzp_test_fake', 'key_secret', 'secret');
-    const event = (refund_status: 'full' | 'partial', amount_refunded: number) => {
+  describe('real Razorpay refunds', () => {
+    const PAYMENT = { id: 'pay_123', amount: 79900 };
+
+    /** A signed `refund.processed` delivery, optionally carrying the payment it refers to. */
+    function processed(provider: BillingProvider, payment?: object) {
       const body = JSON.stringify({
-        event: 'payment.refunded',
+        event: 'refund.processed',
         payload: {
-          payment: {
-            entity: { id: 'pay_123', amount: 79900, amount_refunded, refund_status },
-          },
+          refund: { entity: { id: 'rfnd_1', payment_id: PAYMENT.id, status: 'processed' } },
+          ...(payment ? { payment: { entity: payment } } : {}),
         },
       });
       const signature = createHmac('sha256', 'secret').update(body).digest('hex');
       return provider.parseWebhook(Buffer.from(body), signature, 'evt_refund');
-    };
+    }
 
-    await expect(event('full', 79900)).resolves.toEqual({
-      id: 'evt_refund',
-      kind: 'refunded',
-      paymentId: 'pay_123',
-      full: true,
+    it('reads whether the payment was refunded in full from the delivery', async () => {
+      const provider = razorpayProvider('rzp_test_fake', 'key_secret', 'secret');
+      const full = { ...PAYMENT, amount_refunded: 79900, refund_status: 'full' };
+      await expect(processed(provider, full)).resolves.toEqual({
+        id: 'evt_refund',
+        kind: 'refunded',
+        paymentId: 'pay_123',
+        full: true,
+      });
+
+      const partial = { ...PAYMENT, amount_refunded: 20000, refund_status: 'partial' };
+      await expect(processed(provider, partial)).resolves.toMatchObject({ full: false });
     });
-    await expect(event('partial', 20000)).resolves.toMatchObject({ full: false });
+
+    it('asks Razorpay about the payment when the delivery leaves it out', async () => {
+      // Two partial refunds that add up to the whole payment count as a full refund.
+      const fetch = vi.fn(async () => ({
+        ...PAYMENT,
+        amount_refunded: 79900,
+        refund_status: 'partial',
+      }));
+      const client = { payments: { fetch } } as unknown as Razorpay;
+      const provider = razorpayProvider('rzp_test_fake', 'key_secret', 'secret', client);
+
+      await expect(processed(provider)).resolves.toMatchObject({
+        paymentId: 'pay_123',
+        full: true,
+      });
+      expect(fetch).toHaveBeenCalledWith('pay_123');
+    });
+
+    it('does not act on a refund that has only been created', async () => {
+      const provider = razorpayProvider('rzp_test_fake', 'key_secret', 'secret');
+      const body = JSON.stringify({
+        event: 'refund.created',
+        payload: { refund: { entity: { id: 'rfnd_1', payment_id: PAYMENT.id } } },
+      });
+      const signature = createHmac('sha256', 'secret').update(body).digest('hex');
+      await expect(
+        provider.parseWebhook(Buffer.from(body), signature, 'evt_created'),
+      ).resolves.toMatchObject({ kind: 'ignored' });
+    });
   });
 
   it('checks real Razorpay signatures', async () => {
