@@ -2,6 +2,8 @@
 
 A collaborative code workspace: a shared editor with live cursors, persistent team chat, and an AI pair-programmer everyone in the project can see. Free and Pro plans with Razorpay payments (test mode).
 
+![The CodeCollab landing page](docs/screenshots/landing.png)
+
 > **Status:** v2 rebuild in progress on the `v2` branch. The original v1 app lives in [`legacy/`](legacy/) for reference. The full design is in [`docs/superpowers/specs/2026-09-18-codecollab-v2-design.md`](docs/superpowers/specs/2026-09-18-codecollab-v2-design.md).
 
 ## Roadmap
@@ -42,14 +44,15 @@ The Clerk webhook (`POST /webhooks/clerk`, events `user.*`) keeps profile change
 
 ## Scripts (run from the repo root)
 
-| Command             | What it does                                          |
-| ------------------- | ----------------------------------------------------- |
-| `npm run dev`       | Start API and web together                            |
-| `npm run build`     | Production build of both apps                         |
-| `npm run lint`      | ESLint across all workspaces                          |
-| `npm run typecheck` | TypeScript checks for every workspace                 |
-| `npm test`          | Vitest suites (the backend uses an in-memory MongoDB) |
-| `npm run format`    | Prettier                                              |
+| Command                     | What it does                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| `npm run dev`               | Start API and web together                                                      |
+| `npm run build`             | Production build of both apps                                                   |
+| `npm run lint`              | ESLint across all workspaces                                                    |
+| `npm run typecheck`         | TypeScript checks for every workspace                                           |
+| `npm test`                  | Vitest suites (the backend uses an in-memory MongoDB)                           |
+| `npm run format`            | Prettier                                                                        |
+| `npm run shots -w frontend` | Re-capture the screenshots in `docs/screenshots` (needs the dev server running) |
 
 ## Running projects in the browser
 

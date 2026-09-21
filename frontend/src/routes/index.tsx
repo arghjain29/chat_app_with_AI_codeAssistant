@@ -6,7 +6,7 @@ import { Logo } from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { ChatPreview } from '@/features/marketing/chat-preview';
-import { EditorPreview } from '@/features/marketing/editor-preview';
+import { ProductTour } from '@/features/marketing/product-tour';
 import { RunPreview } from '@/features/marketing/run-preview';
 import { formatInr } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -43,31 +43,33 @@ function Band({
     >
       <div
         className={cn(
-          'grid items-center gap-10',
-          evidence && 'lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]',
+          'grid gap-x-12 gap-y-8',
+          evidence
+            ? 'items-center lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]'
+            : 'lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]',
         )}
       >
         <div className={cn(flip && 'lg:order-2')}>
           <h2
             id={heading}
-            className="max-w-lg font-display text-3xl leading-tight font-semibold tracking-tight [font-stretch:88%] sm:text-4xl"
+            className="max-w-md font-display text-3xl leading-tight font-semibold tracking-tight [font-stretch:88%] sm:text-4xl"
           >
             {title}
           </h2>
-          <p className="mt-4 max-w-lg text-lg leading-relaxed text-ink-muted">{lead}</p>
-          {facts && (
-            <dl className="mt-8 max-w-lg">
-              {facts.map(([term, detail]) => (
-                <div key={term} className="border-t border-line py-4 sm:flex sm:gap-6">
-                  <dt className="font-medium sm:w-44 sm:shrink-0">{term}</dt>
-                  <dd className="mt-1 text-ink-muted sm:mt-0">{detail}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-          {children}
+          <p className="mt-4 max-w-md text-lg leading-relaxed text-ink-muted">{lead}</p>
         </div>
         {evidence}
+        {facts && (
+          <dl className={cn(evidence && 'lg:col-span-2')}>
+            {facts.map(([term, detail]) => (
+              <div key={term} className="border-t border-line py-4 sm:flex sm:gap-8">
+                <dt className="font-medium sm:w-48 sm:shrink-0">{term}</dt>
+                <dd className="mt-1 text-ink-muted sm:mt-0">{detail}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {children}
       </div>
     </section>
   );
@@ -136,7 +138,7 @@ function Landing() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4">
-        <div className="grid items-center gap-12 pt-8 pb-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:pb-24">
+        <div className="grid items-center gap-12 py-10 lg:min-h-[76dvh] lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:py-16">
           <section>
             <h1 className="font-display text-5xl leading-[1.02] font-bold tracking-tight [font-stretch:88%] sm:text-6xl">
               Write code in the same file, at the same time.
@@ -162,7 +164,7 @@ function Landing() {
             </p>
           </section>
 
-          <EditorPreview />
+          <ProductTour />
         </div>
 
         <Band
@@ -188,16 +190,8 @@ function Landing() {
           title="Run it without leaving the tab"
           lead="Node projects install and run in the browser, on your own machine, with a live preview beside the editor. What happens depends on what is in the project."
           evidence={<RunPreview />}
-        >
-          <dl className="mt-8 max-w-lg">
-            {RUNTIME.map(([term, detail]) => (
-              <div key={term} className="border-t border-line py-4 sm:flex sm:gap-6">
-                <dt className="font-mono text-sm sm:w-44 sm:shrink-0 sm:pt-0.5">{term}</dt>
-                <dd className="mt-1 text-ink-muted sm:mt-0">{detail}</dd>
-              </div>
-            ))}
-          </dl>
-        </Band>
+          facts={RUNTIME}
+        />
 
         <Band
           title="The unglamorous parts are done"
