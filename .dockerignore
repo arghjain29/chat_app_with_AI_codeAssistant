@@ -1,0 +1,18 @@
+# Keep the build context small, and keep secrets out of images.
+.git
+.github
+.claude
+node_modules
+**/node_modules
+dist
+**/dist
+legacy
+docs
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+.vscode
+.idea
+coverage
+**/coverage

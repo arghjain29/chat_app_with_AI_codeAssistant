@@ -54,6 +54,32 @@ The Clerk webhook (`POST /webhooks/clerk`, events `user.*`) keeps profile change
 | `npm run format`            | Prettier                                                                        |
 | `npm run shots -w frontend` | Re-capture the screenshots in `docs/screenshots` (needs the dev server running) |
 
+## Docker
+
+The whole stack — MongoDB, Redis, the API and the web app — runs with one command. Useful for
+trying a production build locally, and for anyone who doesn't want Node and MongoDB installed.
+
+```bash
+cp .env.docker.example .env    # the two values the web image is built with
+docker compose up --build      # web on http://localhost:8080, API on http://localhost:3000
+```
+
+API secrets (Clerk, Gemini, Razorpay) are read from `backend/.env` at run time, so nothing secret
+goes into an image. Compose overrides `MONGO_URI`, `REDIS_URL` and `FRONTEND_URL` to point at the
+containers, leaving the rest of that file alone.
+
+| Image | Built from            | What it is                                                                 |
+| ----- | --------------------- | -------------------------------------------------------------------------- |
+| API   | `backend/Dockerfile`  | Node 22 Alpine, runs the bundled `dist/server.js` as a non-root user       |
+| Web   | `frontend/Dockerfile` | nginx serving the built SPA, with the COOP/COEP headers WebContainer needs |
+
+Both build from the repository root, because the npm workspace needs the root lockfile and the
+`shared` package: `docker build -f backend/Dockerfile -t codecollab-api .`
+
+**Vite inlines `VITE_*` values at build time**, so the web image is tied to the API URL it was
+built with. Changing `VITE_API_URL` or the Clerk key means `docker compose build web`, not a
+restart. The API, by contrast, reads its configuration when it starts.
+
 ## Running projects in the browser
 
 Projects run inside [WebContainer](https://webcontainers.io) (Node.js in the browser), on each person's own machine. What **Run** does depends on the files:

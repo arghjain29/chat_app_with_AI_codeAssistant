@@ -1,0 +1,75 @@
+# The whole app on your machine: database, cache, API and web server.
+#
+#   cp .env.docker.example .env          # the two values the web build needs
+#   docker compose up --build            # http://localhost:8080
+#
+# Secrets (Clerk, Gemini, Razorpay) are read from backend/.env, the same file
+# `npm run dev` uses. Nothing secret is baked into an image.
+name: codecollab
+
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # Not published: only the API talks to it. Uncomment to open it in Compass.
+    # ports: ['27017:27017']
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Cache only, so don't spend disk on persistence.
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env
+        required: false
+    # These win over anything in backend/.env: inside Compose the database and
+    # cache are containers, and the web app is served from port 8080.
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      MONGO_URI: mongodb://mongo:27017/codecollab
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:8080
+    ports:
+      - '3000:3000'
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      # Vite bakes these in, so they belong to the build, not the running container.
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:?copy .env.docker.example to .env first}
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    depends_on:
+      - api
+
+volumes:
+  mongo-data:
